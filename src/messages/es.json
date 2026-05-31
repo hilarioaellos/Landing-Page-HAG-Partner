@@ -1,0 +1,232 @@
+{
+  "nav": {
+    "about": "Quiénes Somos",
+    "channels": "Canales",
+    "why": "Por qué HAG",
+    "how": "Cómo Trabajamos",
+    "contact": "Contacto",
+    "cta": "Contactar"
+  },
+  "hero": {
+    "eyebrow": "B2B · Florida, Estados Unidos",
+    "title": "Conectamos marcas con mercados estratégicos.",
+    "subtitle": "HAG Partner LLC es una empresa B2B con sede en Florida que ayuda a marcas, fabricantes, proveedores y distribuidores a crecer en exportación, distribución y comercio digital.",
+    "ctaPrimary": "Ver canales",
+    "ctaSecondary": "Contáctanos",
+    "scroll": "Desplazar",
+    "meta": [
+      {
+        "k": "EXPORTACIÓN",
+        "v": "Comercio internacional"
+      },
+      {
+        "k": "DISTRIBUCIÓN",
+        "v": "Compradores B2B"
+      },
+      {
+        "k": "DIGITAL",
+        "v": "Crecimiento omnicanal"
+      }
+    ]
+  },
+  "about": {
+    "eyebrow": "Quiénes Somos",
+    "title": "Un socio comercial pensado para el crecimiento a largo plazo.",
+    "body": "HAG Partner LLC es una empresa B2B con sede en Florida que apoya a marcas, fabricantes, proveedores y distribuidores con rutas prácticas al mercado. Nos enfocamos en relaciones comerciales sostenibles, ejecución estructurada y crecimiento en los canales de exportación, distribución y comercio digital.",
+    "stats": [
+      {
+        "value": "Florida",
+        "label": "Presencia comercial en EE.UU."
+      },
+      {
+        "value": "EN · ES",
+        "label": "Operaciones bilingües"
+      },
+      {
+        "value": "3",
+        "label": "Canales de crecimiento integrados"
+      }
+    ]
+  },
+  "channels": {
+    "eyebrow": "Canales",
+    "title": "Tres canales de crecimiento.",
+    "intro": "Cada canal puede operar de forma independiente o como parte de una estrategia de expansión integrada.",
+    "cards": [
+      {
+        "tag": "01",
+        "name": "Soluciones de Exportación",
+        "desc": "Apoyo a la expansión de mercado para marcas y proveedores que buscan oportunidades de comercio internacional confiables, coordinación estructurada y seguimiento comercial.",
+        "bullets": [
+          "Comercio internacional",
+          "Coordinación estructurada",
+          "Seguimiento comercial"
+        ],
+        "cta": "Saber más"
+      },
+      {
+        "tag": "02",
+        "name": "Servicios de Distribución",
+        "desc": "Relaciones de distribución B2B diseñadas para conectar productos con compradores, operadores y socios comerciales enfocados en el crecimiento.",
+        "bullets": [
+          "Compradores alineados",
+          "Operadores y socios",
+          "Enfoque en crecimiento"
+        ],
+        "cta": "Saber más"
+      },
+      {
+        "tag": "03",
+        "name": "Comercio Digital",
+        "desc": "Desarrollo amplio de canales de venta en línea, planificación de crecimiento omnicanal y distribución digital escalable sin limitarse a un solo marketplace.",
+        "bullets": [
+          "Desarrollo de canales",
+          "Planificación omnicanal",
+          "Multi-marketplace"
+        ],
+        "cta": "Saber más"
+      }
+    ]
+  },
+  "why": {
+    "eyebrow": "Por qué HAG Partner",
+    "title": "Un modelo operativo práctico para empresas que valoran confianza, claridad y ejecución constante.",
+    "points": [
+      {
+        "icon": "pin",
+        "name": "Con sede en Florida",
+        "desc": "Presencia comercial en EE.UU. con acceso a un entorno comercial dinámico."
+      },
+      {
+        "icon": "bilingual",
+        "name": "Operaciones bilingües",
+        "desc": "Comunicación en inglés y español para una coordinación regional más fluida."
+      },
+      {
+        "icon": "personal",
+        "name": "Alianzas estratégicas",
+        "desc": "Trabajo basado en relaciones con marcas, proveedores y aliados comerciales."
+      },
+      {
+        "icon": "reach",
+        "name": "Alcance internacional",
+        "desc": "Planificación de crecimiento pensando en el comercio transfronterizo y el acceso a mercados."
+      },
+      {
+        "icon": "network",
+        "name": "Red de distribución",
+        "desc": "Desarrollo de canales enfocado en el ajuste, la confiabilidad y el valor a largo plazo."
+      },
+      {
+        "icon": "growth",
+        "name": "Enfoque en crecimiento a largo plazo",
+        "desc": "Estrategias comerciales construidas más allá de una transacción o una plataforma."
+      }
+    ]
+  },
+  "how": {
+    "eyebrow": "Cómo Trabajamos",
+    "title": "Del descubrimiento al crecimiento.",
+    "steps": [
+      {
+        "n": "01",
+        "name": "Descubrimiento",
+        "desc": "Entender objetivos, categorías, preparación y mercados prioritarios."
+      },
+      {
+        "n": "02",
+        "name": "Evaluación",
+        "desc": "Revisar el ajuste del producto, los términos comerciales y los requisitos de canal."
+      },
+      {
+        "n": "03",
+        "name": "Estrategia",
+        "desc": "Definir la ruta al mercado, las prioridades operativas y el plan de crecimiento."
+      },
+      {
+        "n": "04",
+        "name": "Ejecución",
+        "desc": "Coordinar el contacto con socios, las acciones de distribución y la configuración de canales digitales."
+      },
+      {
+        "n": "05",
+        "name": "Crecimiento",
+        "desc": "Dar seguimiento a oportunidades, optimizar el desempeño y profundizar las relaciones comerciales."
+      }
+    ]
+  },
+  "work": {
+    "eyebrow": "Con Quién Trabajamos",
+    "title": "Pensado para ambos lados de la mesa.",
+    "cards": [
+      {
+        "icon": "store",
+        "name": "Marcas y Fabricantes",
+        "desc": "Empresas que buscan una expansión estructurada, representación comercial confiable y acceso a oportunidades de exportación, distribución o comercio digital."
+      },
+      {
+        "icon": "boxes",
+        "name": "Proveedores y Distribuidores",
+        "desc": "Organizaciones que buscan conectar productos, capacidades e inventario regional con compradores alineados y socios comerciales a largo plazo."
+      }
+    ]
+  },
+  "contact": {
+    "eyebrow": "Contacto",
+    "title": "Mapeemos tu ruta al mercado.",
+    "body": "Cuéntanos sobre tu marca, tus productos y los mercados que estás evaluando. Responderemos en un día hábil.",
+    "company": "HAG Partner LLC",
+    "location": "Florida, Estados Unidos",
+    "email": "partners@hagpartner.com",
+    "labels": {
+      "name": "Nombre",
+      "email": "Correo corporativo",
+      "message": "¿En qué podemos ayudar?",
+      "send": "Enviar mensaje",
+      "sending": "Enviando…",
+      "sent": "Mensaje enviado — te contactaremos pronto.",
+      "errName": "Ingresa tu nombre.",
+      "errEmail": "Ingresa un correo corporativo válido.",
+      "errMessage": "Una nota breve nos ayuda a dirigir tu solicitud."
+    }
+  },
+  "footer": {
+    "tagline": "Conectamos marcas con mercados estratégicos.",
+    "groups": [
+      {
+        "name": "Canales",
+        "links": [
+          "Soluciones de Exportación",
+          "Servicios de Distribución",
+          "Comercio Digital"
+        ]
+      },
+      {
+        "name": "Compañía",
+        "links": [
+          "Quiénes Somos",
+          "Por qué HAG",
+          "Cómo Trabajamos"
+        ]
+      },
+      {
+        "name": "Legal",
+        "links": [
+          "Privacidad",
+          "Términos",
+          "Cookies"
+        ]
+      }
+    ],
+    "rights": "© 2025 HAG Partner LLC. Todos los derechos reservados.",
+    "private": "Acceso de socios"
+  },
+  "modal": {
+    "badge": "En desarrollo",
+    "portalTitle": "Portal de Socios",
+    "portalBody": "El portal de socios — cuentas, panel y mini-apps — está actualmente en desarrollo y estará disponible pronto.",
+    "devTitle": "Próximamente",
+    "devBody": "Esta sección está actualmente en desarrollo.",
+    "close": "Entendido"
+  }
+}
