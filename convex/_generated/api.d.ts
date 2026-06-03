@@ -11,6 +11,7 @@
 import type * as auth from "../auth.js";
 import type * as bootstrap from "../bootstrap.js";
 import type * as contact from "../contact.js";
+import type * as emails_welcome from "../emails/welcome.js";
 import type * as http from "../http.js";
 import type * as invitations from "../invitations.js";
 import type * as lib_crypto from "../lib/crypto.js";
@@ -29,6 +30,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   bootstrap: typeof bootstrap;
   contact: typeof contact;
+  "emails/welcome": typeof emails_welcome;
   http: typeof http;
   invitations: typeof invitations;
   "lib/crypto": typeof lib_crypto;
