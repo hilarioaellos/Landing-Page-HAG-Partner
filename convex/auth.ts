@@ -2,6 +2,7 @@ import { convexAuth } from "@convex-dev/auth/server";
 import { Password } from "@convex-dev/auth/providers/Password";
 import { ConvexError } from "convex/values";
 import type { MutationCtx } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { sha256hex } from "./lib/crypto";
 
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
@@ -100,6 +101,18 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
       });
 
       await db.patch(invitation._id, { usedAt: now });
+
+      const org = await db.get(invitation.orgId);
+      const scheduler = (ctx as unknown as MutationCtx).scheduler;
+      try {
+        await scheduler.runAfter(0, internal.emails.welcome.sendWelcomeEmail, {
+          email: profile.email.toLowerCase(),
+          firstName: invitation.firstName ?? "",
+          orgName: org?.name ?? "HAG Partner",
+        });
+      } catch {
+        // Email scheduling failed; user is still created
+      }
 
       return userId;
     },
