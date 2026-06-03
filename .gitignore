@@ -21,6 +21,17 @@ yarn-error.log*
 
 # local env files
 .env*.local
+*.env
+.env
+
+# sensitive / generated scripts
+set_key.js
+new_keys.env
+
+# logs
+*.log
+dev.log
+dev_fresh.log
 
 # typescript
 *.tsbuildinfo

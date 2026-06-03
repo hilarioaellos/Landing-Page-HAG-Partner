@@ -1,9 +1,9 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useI18n, scrollToId } from "@/lib/i18n";
-import { useModal } from "@/lib/modal";
 import {
   IconExport,
   IconIntegrated,
@@ -21,7 +21,6 @@ const NAV_ITEMS = [
 
 export default function Navbar() {
   const { t, lang, setLang } = useI18n();
-  const { open } = useModal();
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -30,8 +29,6 @@ export default function Navbar() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-
-  const openPortal = () => open({ title: t.modal.portalTitle, body: t.modal.portalBody });
 
   return (
     <header className={`nav nav-white${scrolled ? " nav-scrolled" : ""}`}>
@@ -87,9 +84,9 @@ export default function Navbar() {
               ES
             </button>
           </div>
-          <button className="btn btn-primary btn-sm" onClick={openPortal}>
+          <Link href="/sign-in" className="btn btn-primary btn-sm">
             {t.footer.private}
-          </button>
+          </Link>
         </div>
       </div>
 

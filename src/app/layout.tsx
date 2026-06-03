@@ -3,6 +3,8 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { I18nProvider } from "@/lib/i18n";
 import { ModalProvider } from "@/lib/modal";
+import ConvexClientProvider from "@/components/ConvexClientProvider";
+import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -17,14 +19,17 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  // Default look = the approved version: dark background + white navbar.
   return (
-    <html lang="en" data-theme="dark" data-nav="white" className={inter.variable}>
-      <body style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}>
-        <I18nProvider>
-          <ModalProvider>{children}</ModalProvider>
-        </I18nProvider>
-      </body>
-    </html>
+    <ConvexAuthNextjsServerProvider>
+      <html lang="en" data-theme="dark" data-nav="white" className={inter.variable}>
+        <body style={{ fontFamily: "var(--font-inter), system-ui, sans-serif" }}>
+          <ConvexClientProvider>
+            <I18nProvider>
+              <ModalProvider>{children}</ModalProvider>
+            </I18nProvider>
+          </ConvexClientProvider>
+        </body>
+      </html>
+    </ConvexAuthNextjsServerProvider>
   );
 }

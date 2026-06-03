@@ -1,0 +1,355 @@
+import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
+import { authTables } from "@convex-dev/auth/server";
+
+export default defineSchema({
+  ...authTables,
+
+  // ============ ORGANIZATIONS & USERS ============
+  organizations: defineTable({
+    name: v.string(),
+    slug: v.string(),
+    logo: v.optional(v.string()),
+    plan: v.union(v.literal("free"), v.literal("pro"), v.literal("enterprise")),
+    isActive: v.boolean(),
+  }).index("by_slug", ["slug"]),
+
+  profiles: defineTable({
+    userId: v.id("users"),
+    orgId: v.optional(v.id("organizations")), // null until assigned by super_admin
+    role: v.union(
+      v.literal("super_admin"),
+      v.literal("admin"),
+      v.literal("manager"),
+      v.literal("partner"),
+      v.literal("viewer")
+    ),
+    firstName: v.string(),
+    lastName: v.string(),
+    phone: v.optional(v.string()),
+    avatar: v.optional(v.string()),
+    isActive: v.boolean(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_org", ["orgId"])
+    .index("by_user_org", ["userId", "orgId"]),
+
+  // ============ CONTACT LEADS ============
+  contact_leads: defineTable({
+    name: v.string(),
+    email: v.string(),
+    message: v.string(),
+    status: v.union(v.literal("new"), v.literal("contacted"), v.literal("closed")),
+  }).index("by_status", ["status"]),
+
+  // ============ INVITATIONS ============
+  invitations: defineTable({
+    orgId: v.id("organizations"),
+    email: v.string(),
+    role: v.union(
+      v.literal("admin"),
+      v.literal("manager"),
+      v.literal("partner"),
+      v.literal("viewer")
+    ),
+    firstName: v.optional(v.string()),
+    lastName: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    tokenHash: v.string(),
+    expiresAt: v.number(),
+    usedAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+    createdBy: v.id("users"),
+  })
+    .index("by_token_hash", ["tokenHash"])
+    .index("by_org", ["orgId"]),
+
+  // ============ FINANZAS PERSONALES ============
+  finance_accounts: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    type: v.union(
+      v.literal("checking"),
+      v.literal("savings"),
+      v.literal("credit"),
+      v.literal("investment"),
+      v.literal("cash")
+    ),
+    balance: v.number(),
+    currency: v.string(),
+    institution: v.optional(v.string()),
+    isActive: v.boolean(),
+  }).index("by_user", ["userId"]),
+
+  finance_transactions: defineTable({
+    userId: v.id("users"),
+    accountId: v.id("finance_accounts"),
+    amount: v.number(),
+    type: v.union(v.literal("income"), v.literal("expense"), v.literal("transfer")),
+    category: v.string(),
+    description: v.string(),
+    date: v.number(),
+    tags: v.optional(v.array(v.string())),
+    transferToAccountId: v.optional(v.id("finance_accounts")),
+  })
+    .index("by_user", ["userId"])
+    .index("by_account", ["accountId"])
+    .index("by_date", ["date"]),
+
+  finance_budgets: defineTable({
+    userId: v.id("users"),
+    category: v.string(),
+    limit: v.number(),
+    period: v.union(v.literal("monthly"), v.literal("yearly")),
+    currency: v.string(),
+  }).index("by_user", ["userId"]),
+
+  // ============ CONTABILIDAD ============
+  chart_of_accounts: defineTable({
+    orgId: v.id("organizations"),
+    code: v.string(),
+    name: v.string(),
+    type: v.union(
+      v.literal("asset"),
+      v.literal("liability"),
+      v.literal("equity"),
+      v.literal("revenue"),
+      v.literal("expense")
+    ),
+    parentId: v.optional(v.id("chart_of_accounts")),
+    isActive: v.boolean(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_code", ["orgId", "code"]),
+
+  journal_entries: defineTable({
+    orgId: v.id("organizations"),
+    createdBy: v.id("users"),
+    date: v.number(),
+    description: v.string(),
+    reference: v.optional(v.string()),
+    lines: v.array(
+      v.object({
+        accountId: v.id("chart_of_accounts"),
+        debit: v.number(),
+        credit: v.number(),
+        description: v.optional(v.string()),
+      })
+    ),
+    status: v.union(v.literal("draft"), v.literal("posted"), v.literal("voided")),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_date", ["orgId", "date"]),
+
+  invoices: defineTable({
+    orgId: v.id("organizations"),
+    createdBy: v.id("users"),
+    number: v.string(),
+    contactId: v.optional(v.id("crm_contacts")),
+    issueDate: v.number(),
+    dueDate: v.number(),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("sent"),
+      v.literal("paid"),
+      v.literal("overdue"),
+      v.literal("cancelled")
+    ),
+    items: v.array(
+      v.object({
+        description: v.string(),
+        quantity: v.number(),
+        unitPrice: v.number(),
+        taxRate: v.optional(v.number()),
+      })
+    ),
+    subtotal: v.number(),
+    taxAmount: v.number(),
+    total: v.number(),
+    currency: v.string(),
+    notes: v.optional(v.string()),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_contact", ["contactId"])
+    .index("by_status", ["orgId", "status"]),
+
+  // ============ PROVEEDORES ============
+  suppliers: defineTable({
+    orgId: v.id("organizations"),
+    name: v.string(),
+    contactName: v.optional(v.string()),
+    email: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    website: v.optional(v.string()),
+    address: v.optional(v.string()),
+    category: v.optional(v.string()),
+    status: v.union(v.literal("active"), v.literal("inactive")),
+    paymentTerms: v.optional(v.string()),
+    taxId: v.optional(v.string()),
+    notes: v.optional(v.string()),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_status", ["orgId", "status"]),
+
+  supplier_products: defineTable({
+    orgId: v.id("organizations"),
+    supplierId: v.id("suppliers"),
+    name: v.string(),
+    sku: v.optional(v.string()),
+    price: v.number(),
+    currency: v.string(),
+    unit: v.optional(v.string()),
+    minOrder: v.optional(v.number()),
+    leadTimeDays: v.optional(v.number()),
+    isActive: v.boolean(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_supplier", ["supplierId"]),
+
+  purchase_orders: defineTable({
+    orgId: v.id("organizations"),
+    createdBy: v.id("users"),
+    supplierId: v.id("suppliers"),
+    number: v.string(),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("sent"),
+      v.literal("confirmed"),
+      v.literal("received"),
+      v.literal("cancelled")
+    ),
+    orderDate: v.number(),
+    expectedDate: v.optional(v.number()),
+    items: v.array(
+      v.object({
+        productId: v.optional(v.id("supplier_products")),
+        description: v.string(),
+        quantity: v.number(),
+        unitPrice: v.number(),
+      })
+    ),
+    total: v.number(),
+    currency: v.string(),
+    notes: v.optional(v.string()),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_supplier", ["supplierId"])
+    .index("by_status", ["orgId", "status"]),
+
+  // ============ DOCUMENTOS ============
+  document_folders: defineTable({
+    orgId: v.id("organizations"),
+    createdBy: v.id("users"),
+    name: v.string(),
+    parentId: v.optional(v.id("document_folders")),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_parent", ["parentId"]),
+
+  documents: defineTable({
+    orgId: v.id("organizations"),
+    uploadedBy: v.id("users"),
+    folderId: v.optional(v.id("document_folders")),
+    name: v.string(),
+    mimeType: v.string(),
+    sizeBytes: v.number(),
+    storageId: v.id("_storage"),
+    tags: v.optional(v.array(v.string())),
+    description: v.optional(v.string()),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_folder", ["folderId"])
+    .index("by_uploader", ["uploadedBy"]),
+
+  // ============ MENSAJERÍA ============
+  conversations: defineTable({
+    orgId: v.id("organizations"),
+    name: v.optional(v.string()),
+    isGroup: v.boolean(),
+    participants: v.array(v.id("users")),
+    createdBy: v.id("users"),
+    lastMessageAt: v.optional(v.number()),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_last_message", ["orgId", "lastMessageAt"]),
+
+  messages: defineTable({
+    conversationId: v.id("conversations"),
+    senderId: v.id("users"),
+    content: v.string(),
+    type: v.union(v.literal("text"), v.literal("file")),
+    fileId: v.optional(v.id("documents")),
+    readBy: v.array(v.id("users")),
+    editedAt: v.optional(v.number()),
+  })
+    .index("by_conversation", ["conversationId"]),
+
+  // ============ CRM ============
+  crm_contacts: defineTable({
+    orgId: v.id("organizations"),
+    createdBy: v.id("users"),
+    firstName: v.string(),
+    lastName: v.string(),
+    email: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    company: v.optional(v.string()),
+    position: v.optional(v.string()),
+    status: v.union(
+      v.literal("lead"),
+      v.literal("prospect"),
+      v.literal("customer"),
+      v.literal("inactive")
+    ),
+    source: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
+    notes: v.optional(v.string()),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_status", ["orgId", "status"]),
+
+  crm_deals: defineTable({
+    orgId: v.id("organizations"),
+    createdBy: v.id("users"),
+    contactId: v.id("crm_contacts"),
+    title: v.string(),
+    value: v.number(),
+    currency: v.string(),
+    stage: v.union(
+      v.literal("lead"),
+      v.literal("qualified"),
+      v.literal("proposal"),
+      v.literal("negotiation"),
+      v.literal("won"),
+      v.literal("lost")
+    ),
+    expectedCloseDate: v.optional(v.number()),
+    probability: v.optional(v.number()),
+    notes: v.optional(v.string()),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_contact", ["contactId"])
+    .index("by_stage", ["orgId", "stage"]),
+
+  crm_activities: defineTable({
+    orgId: v.id("organizations"),
+    userId: v.id("users"),
+    contactId: v.id("crm_contacts"),
+    dealId: v.optional(v.id("crm_deals")),
+    type: v.union(
+      v.literal("call"),
+      v.literal("email"),
+      v.literal("meeting"),
+      v.literal("note"),
+      v.literal("task")
+    ),
+    title: v.string(),
+    description: v.optional(v.string()),
+    dueDate: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    status: v.union(v.literal("pending"), v.literal("completed"), v.literal("cancelled")),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_contact", ["contactId"])
+    .index("by_deal", ["dealId"])
+    .index("by_user", ["userId"]),
+});

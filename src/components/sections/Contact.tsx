@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { useI18n } from "@/lib/i18n";
 import { Eyebrow } from "@/components/Eyebrow";
 import { IconArrow, IconMail, IconPin } from "@/components/icons";
@@ -10,6 +12,7 @@ type Status = "idle" | "sending" | "sent";
 
 export default function Contact() {
   const { t } = useI18n();
+  const submitContactForm = useMutation(api.contact.submitContactForm);
   const [state, setState] = useState({ name: "", email: "", message: "" });
   const [errors, setErrors] = useState<Errors>({});
   const [status, setStatus] = useState<Status>("idle");
@@ -29,15 +32,17 @@ export default function Contact() {
     return Object.keys(er).length === 0;
   };
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
     setStatus("sending");
-    // No backend yet — simulate a send. Wire to an API route / CRM in Stage 2.
-    setTimeout(() => {
+    try {
+      await submitContactForm({ name: state.name, email: state.email, message: state.message });
       setStatus("sent");
       setState({ name: "", email: "", message: "" });
-    }, 900);
+    } catch {
+      setStatus("idle");
+    }
   };
 
   return (

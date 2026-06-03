@@ -138,3 +138,83 @@ export const IconBoxes = (p: IconProps) => (
     <rect x="13" y="13.5" width="8" height="7" />
   </Base>
 );
+
+// ── Portal icons ──────────────────────────────────────────────────────────────
+export const IconDashboard = (p: IconProps) => (
+  <Base {...p}>
+    <rect x="3" y="3" width="8" height="8" />
+    <rect x="13" y="3" width="8" height="8" />
+    <rect x="3" y="13" width="8" height="8" />
+    <rect x="13" y="13" width="8" height="8" />
+  </Base>
+);
+
+export const IconUsers = (p: IconProps) => (
+  <Base {...p}>
+    <circle cx="9" cy="7" r="3.5" />
+    <path d="M2 20c0-4 3-6.5 7-6.5s7 2.5 7 6.5" />
+    <path d="M16 3.5a3.5 3.5 0 010 7" />
+    <path d="M22 20c0-3.5-2-5.5-5-6" />
+  </Base>
+);
+
+export const IconWallet = (p: IconProps) => (
+  <Base {...p}>
+    <rect x="2" y="6" width="20" height="14" />
+    <path d="M2 10h20" />
+    <circle cx="17" cy="15" r="1.5" />
+    <path d="M2 6l5-3h10" />
+  </Base>
+);
+
+export const IconLedger = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M4 3h13l3 3v15H4z" />
+    <path d="M14 3v6h6" />
+    <path d="M8 12h8M8 16h6" />
+  </Base>
+);
+
+export const IconTruck = (p: IconProps) => (
+  <Base {...p}>
+    <rect x="1" y="7" width="14" height="11" />
+    <path d="M15 12h4l3 4v2H15z" />
+    <circle cx="5.5" cy="18.5" r="2" />
+    <circle cx="18.5" cy="18.5" r="2" />
+  </Base>
+);
+
+export const IconFolder = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M2 6.5C2 5 3 4 4.5 4H9l2 2.5h8.5C21 6.5 22 7.5 22 9v9c0 1.5-1 2.5-2.5 2.5h-15C3 20.5 2 19.5 2 18z" />
+  </Base>
+);
+
+export const IconChat = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+  </Base>
+);
+
+export const IconContacts = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
+  </Base>
+);
+
+export const IconLogout = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M9 21H4a2 2 0 01-2-2V5a2 2 0 012-2h5" />
+    <path d="M16 17l5-5-5-5" />
+    <path d="M21 12H9" />
+  </Base>
+);
+
+export const IconUser = (p: IconProps) => (
+  <Base {...p}>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+  </Base>
+);
