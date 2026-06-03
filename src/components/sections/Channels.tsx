@@ -27,7 +27,10 @@ export default function Channels() {
                   </div>
                   <span className="line-tag">{c.tag}</span>
                 </div>
-                <h3 className="card-title">{c.name}</h3>
+                <div className="card-title-row">
+                  <h3 className="card-title">{c.name}</h3>
+                  {c.badge && <span className="card-badge">{c.badge}</span>}
+                </div>
                 <p className="card-body">{c.desc}</p>
                 <ul className="card-bullets">
                   {c.bullets.map((b, j) => (
