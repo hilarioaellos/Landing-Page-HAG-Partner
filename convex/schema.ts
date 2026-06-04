@@ -429,11 +429,12 @@ export default defineSchema({
   fintrack_debts: defineTable({
     userId: v.id("users"),
     name: v.string(),
+    lender: v.string(),
+    type: v.union(v.literal("revolving"), v.literal("installment")),
+    currencyCode: v.string(),
     balanceCents: v.number(),
     interestRateBps: v.number(),
     monthlyPaymentCents: v.number(),
-    type: v.union(v.literal("revolving"), v.literal("installment")),
-    lender: v.string(),
     isActive: v.boolean(),
   }).index("by_user", ["userId"]),
 
