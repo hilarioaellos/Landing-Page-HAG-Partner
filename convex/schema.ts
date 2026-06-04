@@ -500,7 +500,8 @@ export default defineSchema({
     notes: v.optional(v.string()),
   })
     .index("by_user", ["userId"])
-    .index("by_account", ["accountId"]),
+    .index("by_account", ["accountId"])
+    .index("by_account_date", ["accountId", "date"]),
 
   fintrack_user_settings: defineTable({
     userId: v.id("users"),
