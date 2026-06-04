@@ -1,5 +1,5 @@
-import { ConvexError } from "convex/values";
-import { internalMutation, mutation, query } from "../_generated/server";
+﻿import { ConvexError } from "convex/values";
+import { mutation, query, internalMutation } from "../_generated/server";
 import { v } from "convex/values";
 import { requireUserId } from "./_auth";
 
@@ -9,32 +9,64 @@ export const listUnread = query({
     const userId = await requireUserId(ctx);
     return ctx.db
       .query("fintrack_notifications")
-      .withIndex("by_user_unread", (q) => q.eq("userId", userId).eq("isRead", false))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) => q.eq(q.field("isRead"), false))
       .order("desc")
-      .take(20);
+      .take(10);
   },
 });
 
-export const markAllRead = mutation({
+export const list = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, { limit = 10 }) => {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100)
+      throw new ConvexError("limit must be an integer between 1 and 100");
+    const userId = await requireUserId(ctx);
+    return ctx.db
+      .query("fintrack_notifications")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .order("desc")
+      .take(limit);
+  },
+});
+
+export const unreadCount = query({
   args: {},
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
     const unread = await ctx.db
       .query("fintrack_notifications")
-      .withIndex("by_user_unread", (q) => q.eq("userId", userId).eq("isRead", false))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) => q.eq(q.field("isRead"), false))
       .collect();
-    await Promise.all(unread.map((n) => ctx.db.patch(n._id, { isRead: true })));
+    return { unreadCount: unread.length };
   },
 });
 
-export const markRead = mutation({
+export const markAsRead = mutation({
   args: { id: v.id("fintrack_notifications") },
   handler: async (ctx, { id }) => {
     const userId = await requireUserId(ctx);
-    const notif = await ctx.db.get(id);
-    if (!notif || notif.userId !== userId)
+    const notification = await ctx.db.get(id);
+    if (!notification || notification.userId !== userId)
       throw new ConvexError({ code: 403, message: "Forbidden" });
     await ctx.db.patch(id, { isRead: true });
+  },
+});
+
+export const markAllAsRead = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+    const unread = await ctx.db
+      .query("fintrack_notifications")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) => q.eq(q.field("isRead"), false))
+      .collect();
+    for (const notif of unread) {
+      await ctx.db.patch(notif._id, { isRead: true });
+    }
+    return { markedCount: unread.length };
   },
 });
 
@@ -43,51 +75,30 @@ export const checkPaymentDueDates = internalMutation({
   handler: async (ctx) => {
     const today = new Date();
     const todayDay = today.getDate();
-    const year = today.getFullYear();
-    const month = today.getMonth();
 
-    const allCards = await ctx.db.query("fintrack_credit_cards").collect();
+    const users = await ctx.db.query("users").collect();
 
-    for (const card of allCards) {
-      // Fix 4: skip cards linked to inactive or missing accounts
-      const account = await ctx.db.get(card.accountId);
-      if (!account || account.userId !== card.userId || !account.isActive) continue;
+    for (const user of users) {
+      const cards = await ctx.db
+        .query("fintrack_credit_cards")
+        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .collect();
 
-      // Fix 1: compute dueDate first — typeKey must be keyed on the actual due date,
-      // not today's year/month, to avoid duplicates when the cron runs near month boundary.
-      const dueDate = new Date(year, month, card.paymentDueDay);
-      if (card.paymentDueDay < todayDay) dueDate.setMonth(dueDate.getMonth() + 1);
-      const typeKey = `payment_due_${card._id}_${dueDate.getFullYear()}_${dueDate.getMonth()}`;
+      for (const card of cards) {
+        if (card.paymentDueDay === todayDay) {
+          const account = await ctx.db.get(card.accountId);
+          if (!account) continue;
 
-      const daysUntilDue =
-        card.paymentDueDay >= todayDay
-          ? card.paymentDueDay - todayDay
-          : Math.ceil((dueDate.getTime() - today.getTime()) / 86_400_000);
-
-      if (daysUntilDue > 5) continue;
-
-      const existing = await ctx.db
-        .query("fintrack_notifications")
-        .withIndex("by_user", (q) => q.eq("userId", card.userId))
-        .filter((q) => q.eq(q.field("type"), typeKey))
-        .first();
-
-      if (existing) continue;
-
-      const message =
-        daysUntilDue === 0
-          ? `${account.name} payment is due today`
-          : `${account.name} payment due in ${daysUntilDue} day${daysUntilDue !== 1 ? "s" : ""}`;
-
-      await ctx.db.insert("fintrack_notifications", {
-        userId: card.userId,
-        type: typeKey,
-        message,
-        dueDate: dueDate.getTime(),
-        isRead: false,
-        severity:
-          daysUntilDue === 0 ? "urgent" : daysUntilDue <= 2 ? "warning" : "info",
-      });
+          await ctx.db.insert("fintrack_notifications", {
+            userId: user._id,
+            type: "payment_due",
+            message: `Payment due today for ${account.name}`,
+            dueDate: today.getTime(),
+            isRead: false,
+            severity: "urgent",
+          });
+        }
+      }
     }
   },
 });
