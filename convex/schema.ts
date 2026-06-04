@@ -352,4 +352,159 @@ export default defineSchema({
     .index("by_contact", ["contactId"])
     .index("by_deal", ["dealId"])
     .index("by_user", ["userId"]),
+
+  // ============ FINTRACK ============
+  fintrack_accounts: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    type: v.union(
+      v.literal("checking"),
+      v.literal("savings"),
+      v.literal("investment"),
+      v.literal("credit"),
+      v.literal("cash")
+    ),
+    currencyCode: v.string(),
+    bankName: v.optional(v.string()),
+    initialBalanceCents: v.number(),
+    balanceCents: v.number(),
+    isActive: v.boolean(),
+  }).index("by_user", ["userId"]),
+
+  fintrack_transactions: defineTable({
+    userId: v.id("users"),
+    accountId: v.id("fintrack_accounts"),
+    amountCents: v.number(),
+    currencyCode: v.string(),
+    type: v.union(
+      v.literal("income"),
+      v.literal("expense"),
+      v.literal("transfer")
+    ),
+    categoryId: v.optional(v.id("fintrack_categories")),
+    merchantId: v.optional(v.id("fintrack_merchants")),
+    date: v.number(),
+    source: v.union(v.literal("manual"), v.literal("csv"), v.literal("plaid")),
+    notes: v.optional(v.string()),
+    isReconciled: v.boolean(),
+    transferToAccountId: v.optional(v.id("fintrack_accounts")),
+    importHash: v.optional(v.string()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_account", ["accountId"])
+    .index("by_date", ["userId", "date"])
+    .index("by_category", ["userId", "categoryId"])
+    .index("by_import_hash", ["userId", "importHash"]),
+
+  fintrack_categories: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    icon: v.optional(v.string()),
+    color: v.optional(v.string()),
+    parentId: v.optional(v.id("fintrack_categories")),
+    isSystem: v.boolean(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_parent", ["parentId"]),
+
+  fintrack_merchants: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    normalizedName: v.string(),
+    defaultCategoryId: v.optional(v.id("fintrack_categories")),
+  })
+    .index("by_user", ["userId"])
+    .index("by_normalized", ["userId", "normalizedName"]),
+
+  fintrack_budgets: defineTable({
+    userId: v.id("users"),
+    month: v.number(),
+    year: v.number(),
+    categoryId: v.id("fintrack_categories"),
+    amountPlannedCents: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_period", ["userId", "year", "month"]),
+
+  fintrack_debts: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    balanceCents: v.number(),
+    interestRateBps: v.number(),
+    monthlyPaymentCents: v.number(),
+    type: v.union(v.literal("revolving"), v.literal("installment")),
+    lender: v.string(),
+    isActive: v.boolean(),
+  }).index("by_user", ["userId"]),
+
+  fintrack_credit_cards: defineTable({
+    userId: v.id("users"),
+    accountId: v.id("fintrack_accounts"),
+    closingDay: v.number(),
+    paymentDueDay: v.number(),
+    creditLimitCents: v.number(),
+    minimumPaymentCents: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_account", ["accountId"]),
+
+  fintrack_cash_pockets: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    amountCents: v.number(),
+    accountId: v.id("fintrack_accounts"),
+  })
+    .index("by_user", ["userId"])
+    .index("by_account", ["accountId"]),
+
+  fintrack_transaction_splits: defineTable({
+    userId: v.id("users"),
+    transactionId: v.id("fintrack_transactions"),
+    categoryId: v.id("fintrack_categories"),
+    subcategoryId: v.optional(v.id("fintrack_categories")),
+    amountCents: v.number(),
+    note: v.optional(v.string()),
+  })
+    .index("by_transaction", ["transactionId"])
+    .index("by_user", ["userId"]),
+
+  fintrack_notifications: defineTable({
+    userId: v.id("users"),
+    type: v.string(),
+    message: v.string(),
+    dueDate: v.optional(v.number()),
+    isRead: v.boolean(),
+    severity: v.union(
+      v.literal("urgent"),
+      v.literal("warning"),
+      v.literal("good"),
+      v.literal("info")
+    ),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_unread", ["userId", "isRead"]),
+
+  fintrack_reconciliations: defineTable({
+    userId: v.id("users"),
+    accountId: v.id("fintrack_accounts"),
+    date: v.number(),
+    systemBalanceCents: v.number(),
+    bankBalanceCents: v.number(),
+    differenceCents: v.number(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("completed"),
+      v.literal("discrepancy")
+    ),
+    notes: v.optional(v.string()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_account", ["accountId"]),
+
+  fintrack_user_settings: defineTable({
+    userId: v.id("users"),
+    defaultCurrency: v.string(),
+    dashboardWidgets: v.optional(v.string()),
+    theme: v.optional(v.string()),
+  }).index("by_user", ["userId"]),
 });
