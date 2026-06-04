@@ -17,6 +17,7 @@ import type * as fintrack__auth from "../fintrack/_auth.js";
 import type * as fintrack__balance from "../fintrack/_balance.js";
 import type * as fintrack__money from "../fintrack/_money.js";
 import type * as fintrack_accounts from "../fintrack/accounts.js";
+import type * as fintrack_budgets from "../fintrack/budgets.js";
 import type * as fintrack_cards from "../fintrack/cards.js";
 import type * as fintrack_categories from "../fintrack/categories.js";
 import type * as fintrack_health from "../fintrack/health.js";
@@ -48,6 +49,7 @@ declare const fullApi: ApiFromModules<{
   "fintrack/_balance": typeof fintrack__balance;
   "fintrack/_money": typeof fintrack__money;
   "fintrack/accounts": typeof fintrack_accounts;
+  "fintrack/budgets": typeof fintrack_budgets;
   "fintrack/cards": typeof fintrack_cards;
   "fintrack/categories": typeof fintrack_categories;
   "fintrack/health": typeof fintrack_health;
