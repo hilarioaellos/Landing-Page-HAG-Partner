@@ -28,6 +28,34 @@ export const list = query({
   },
 });
 
+const PERIODICITY = v.union(
+  v.literal("monthly"),
+  v.literal("biweekly"),
+  v.literal("weekly"),
+  v.literal("one_time")
+);
+
+function validateA7Fields(args: {
+  paymentDueDate?: number;
+  totalTermMonths?: number;
+  paidInstallments?: number;
+}) {
+  if (args.paymentDueDate !== undefined) {
+    if (!Number.isInteger(args.paymentDueDate) || args.paymentDueDate < 1 || args.paymentDueDate > 31)
+      throw new ConvexError("paymentDueDate must be an integer between 1 and 31");
+  }
+  if (args.totalTermMonths !== undefined) {
+    if (!Number.isInteger(args.totalTermMonths) || args.totalTermMonths < 1)
+      throw new ConvexError("totalTermMonths must be a positive integer");
+  }
+  if (args.paidInstallments !== undefined) {
+    if (!Number.isInteger(args.paidInstallments) || args.paidInstallments < 0)
+      throw new ConvexError("paidInstallments must be a non-negative integer");
+    if (args.totalTermMonths !== undefined && args.paidInstallments > args.totalTermMonths)
+      throw new ConvexError("paidInstallments cannot exceed totalTermMonths");
+  }
+}
+
 export const create = mutation({
   args: {
     name: v.string(),
@@ -37,10 +65,15 @@ export const create = mutation({
     balanceCents: v.number(),
     interestRateBps: v.number(),
     monthlyPaymentCents: v.number(),
+    // A7 fields
+    originDate: v.optional(v.number()),
+    paymentDueDate: v.optional(v.number()),
+    paymentPeriodicity: v.optional(PERIODICITY),
+    totalTermMonths: v.optional(v.number()),
+    paidInstallments: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    // Fix 2: validate then normalize
     const name = args.name.trim();
     const lender = args.lender.trim();
     const currencyCode = validateCurrencyCode(args.currencyCode);
@@ -52,6 +85,7 @@ export const create = mutation({
       throw new ConvexError("interestRateBps must be an integer between 0 and 100000 (0–1000% APR)");
     validatePositiveCents(args.monthlyPaymentCents, "monthlyPaymentCents");
     if (args.monthlyPaymentCents === 0) throw new ConvexError("monthlyPaymentCents must be greater than 0");
+    validateA7Fields(args);
 
     return ctx.db.insert("fintrack_debts", {
       userId,
@@ -63,6 +97,11 @@ export const create = mutation({
       interestRateBps: args.interestRateBps,
       monthlyPaymentCents: args.monthlyPaymentCents,
       isActive: true,
+      originDate: args.originDate,
+      paymentDueDate: args.paymentDueDate,
+      paymentPeriodicity: args.paymentPeriodicity,
+      totalTermMonths: args.totalTermMonths,
+      paidInstallments: args.paidInstallments,
     });
   },
 });
@@ -76,6 +115,12 @@ export const update = mutation({
     balanceCents: v.optional(v.number()),
     interestRateBps: v.optional(v.number()),
     monthlyPaymentCents: v.optional(v.number()),
+    // A7 fields
+    originDate: v.optional(v.number()),
+    paymentDueDate: v.optional(v.number()),
+    paymentPeriodicity: v.optional(PERIODICITY),
+    totalTermMonths: v.optional(v.number()),
+    paidInstallments: v.optional(v.number()),
   },
   handler: async (ctx, { id, ...fields }) => {
     const userId = await requireUserId(ctx);
@@ -83,7 +128,6 @@ export const update = mutation({
     if (!debt || debt.userId !== userId)
       throw new ConvexError({ code: 403, message: "Forbidden" });
 
-    // Fix 2: normalize strings before validation/storage
     const patch: Record<string, unknown> = {};
     if (fields.name !== undefined) {
       const name = fields.name.trim();
@@ -113,6 +157,20 @@ export const update = mutation({
       if (fields.monthlyPaymentCents === 0) throw new ConvexError("monthlyPaymentCents must be greater than 0");
       patch.monthlyPaymentCents = fields.monthlyPaymentCents;
     }
+    // Usar valores efectivos (entrante ?? persistido) para que el cross-check detecte inconsistencias
+    const effectiveTotalTermMonths = fields.totalTermMonths ?? debt.totalTermMonths;
+    const effectivePaidInstallments = fields.paidInstallments ?? debt.paidInstallments;
+    validateA7Fields({
+      paymentDueDate: fields.paymentDueDate,
+      totalTermMonths: effectiveTotalTermMonths,
+      paidInstallments: effectivePaidInstallments,
+    });
+    if (fields.originDate !== undefined) patch.originDate = fields.originDate;
+    if (fields.paymentDueDate !== undefined) patch.paymentDueDate = fields.paymentDueDate;
+    if (fields.paymentPeriodicity !== undefined) patch.paymentPeriodicity = fields.paymentPeriodicity;
+    if (fields.totalTermMonths !== undefined) patch.totalTermMonths = fields.totalTermMonths;
+    if (fields.paidInstallments !== undefined) patch.paidInstallments = fields.paidInstallments;
+
     if (Object.keys(patch).length > 0) await ctx.db.patch(id, patch);
   },
 });
