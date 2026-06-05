@@ -42,19 +42,54 @@ export const listWithActuals = query({
         .collect(),
     ]);
 
-    // Build category → actual spending map
+    // Pre-fetch all unique categories to avoid N+1 in the rollup loop
+    const usedCatIds = new Set(
+      monthTransactions.map((tx) => tx.categoryId).filter(Boolean)
+    );
+    const catCache: Record<string, { parentId?: string }> = {};
+    for (const id of usedCatIds) {
+      if (!id) continue;
+      const cat = await ctx.db.get(id as typeof monthTransactions[0]["categoryId"] & string);
+      if (cat) catCache[id] = { parentId: cat.parentId ?? undefined };
+    }
+
+    // Build category → actual spending map with parent rollup.
+    // A transaction in a subcategory also accumulates to its parent so that
+    // budget lines defined at the parent level show the correct actuals.
     const actualMap: Record<string, number> = {};
     for (const tx of monthTransactions) {
       if (!tx.categoryId) continue;
       actualMap[tx.categoryId] = (actualMap[tx.categoryId] ?? 0) + Math.abs(tx.amountCents);
+      const parent = catCache[tx.categoryId]?.parentId;
+      if (parent) {
+        actualMap[parent] = (actualMap[parent] ?? 0) + Math.abs(tx.amountCents);
+      }
     }
 
-    return Promise.all(
+    const rows = await Promise.all(
       budgets.map(async (b) => {
         const category = await ctx.db.get(b.categoryId);
         return { ...b, category, actualCents: actualMap[b.categoryId] ?? 0 };
       })
     );
+
+    // Sort: parents before their children, then alphabetically within each level
+    const parentOrder = new Map(
+      rows
+        .filter((r) => !r.category?.parentId)
+        .map((r, i) => [r.categoryId, i])
+    );
+    return rows.sort((a, b) => {
+      const aParent = a.category?.parentId ?? a.categoryId;
+      const bParent = b.category?.parentId ?? b.categoryId;
+      const aOrder = parentOrder.get(aParent) ?? 999;
+      const bOrder = parentOrder.get(bParent) ?? 999;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      // Within same parent group: parent row first, then children alphabetically
+      if (aParent !== a.categoryId && bParent === b.categoryId) return 1;
+      if (aParent === a.categoryId && bParent !== b.categoryId) return -1;
+      return (a.category?.name ?? "").localeCompare(b.category?.name ?? "");
+    });
   },
 });
 

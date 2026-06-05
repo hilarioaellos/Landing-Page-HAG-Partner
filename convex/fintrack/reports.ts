@@ -3,6 +3,41 @@ import { query } from "../_generated/server";
 import { v } from "convex/values";
 import { requireUserId } from "./_auth";
 import type { Id } from "../_generated/dataModel";
+import type { GenericDatabaseReader } from "convex/server";
+import type { DataModel } from "../_generated/dataModel";
+
+// effectiveExclude = category.forceExclude || setting.excludeFromReports
+// Reportes filtran por exclusión efectiva, NO por is_active.
+// Categorías inactivas siguen visibles en histórico — solo se excluyen
+// las que el usuario marcó explícitamente para reportes.
+async function getExcludedCategoryIds(
+  db: GenericDatabaseReader<DataModel>,
+  userId: Id<"users">
+): Promise<Set<string>> {
+  const settings = await db
+    .query("fintrack_category_settings")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .collect();
+
+  const excluded = new Set<string>();
+  for (const s of settings) {
+    if (!s.excludeFromReports) continue;
+    const cat = await db.get(s.categoryId);
+    if (cat?.forceExclude || s.excludeFromReports) {
+      excluded.add(s.categoryId);
+    }
+  }
+
+  // Also exclude forceExclude categories that may lack settings records
+  const forcedCats = await db
+    .query("fintrack_categories")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .filter((q) => q.eq(q.field("forceExclude"), true))
+    .collect();
+  for (const cat of forcedCats) excluded.add(cat._id);
+
+  return excluded;
+}
 
 // Fix 3: input validation helpers
 function validateReportPeriod(year: number, month: number): void {
@@ -77,6 +112,8 @@ export const expensesByCategory = query({
     const startMs = new Date(year, month - 1, 1).getTime();
     const endMs = new Date(year, month, 1).getTime();
 
+    const excluded = await getExcludedCategoryIds(ctx.db, userId);
+
     const txs = await ctx.db
       .query("fintrack_transactions")
       .withIndex("by_date", (q) =>
@@ -87,6 +124,7 @@ export const expensesByCategory = query({
     const totals: Record<string, number> = {};
     for (const tx of txs) {
       if (tx.type !== "expense" || !tx.categoryId || tx.currencyCode !== currency) continue;
+      if (excluded.has(tx.categoryId)) continue;
       totals[tx.categoryId] = (totals[tx.categoryId] ?? 0) + Math.abs(tx.amountCents);
     }
 

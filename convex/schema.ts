@@ -403,9 +403,19 @@ export default defineSchema({
     color: v.optional(v.string()),
     parentId: v.optional(v.id("fintrack_categories")),
     isSystem: v.boolean(),
+    forceExclude: v.optional(v.boolean()),
   })
     .index("by_user", ["userId"])
     .index("by_parent", ["parentId"]),
+
+  fintrack_category_settings: defineTable({
+    userId: v.id("users"),
+    categoryId: v.id("fintrack_categories"),
+    isActive: v.boolean(),
+    excludeFromReports: v.boolean(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_category", ["userId", "categoryId"]),
 
   fintrack_merchants: defineTable({
     userId: v.id("users"),
