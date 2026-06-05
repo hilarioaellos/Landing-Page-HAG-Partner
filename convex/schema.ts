@@ -446,6 +446,19 @@ export default defineSchema({
     interestRateBps: v.number(),
     monthlyPaymentCents: v.number(),
     isActive: v.boolean(),
+    // A7 — enrichment fields
+    originDate: v.optional(v.number()),
+    paymentDueDate: v.optional(v.number()),
+    paymentPeriodicity: v.optional(
+      v.union(
+        v.literal("monthly"),
+        v.literal("biweekly"),
+        v.literal("weekly"),
+        v.literal("one_time")
+      )
+    ),
+    totalTermMonths: v.optional(v.number()),
+    paidInstallments: v.optional(v.number()),
   }).index("by_user", ["userId"]),
 
   fintrack_credit_cards: defineTable({
@@ -519,4 +532,69 @@ export default defineSchema({
     dashboardWidgets: v.optional(v.string()),
     theme: v.optional(v.string()),
   }).index("by_user", ["userId"]),
+
+  // ============ A1 — SUSCRIPCIONES ============
+  fintrack_subscriptions: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    amount: v.number(),
+    currencyCode: v.string(),
+    periodicity: v.union(
+      v.literal("monthly"),
+      v.literal("quarterly"),
+      v.literal("annual"),
+      v.literal("weekly")
+    ),
+    nextRenewalDate: v.number(),
+    accountId: v.id("fintrack_accounts"),
+    categoryId: v.optional(v.id("fintrack_categories")),
+    isActive: v.boolean(),
+    notes: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_active", ["userId", "isActive"])
+    .index("by_renewal", ["userId", "nextRenewalDate"]),
+
+  // ============ A6 — ACREENCIAS ============
+  fintrack_receivables: defineTable({
+    userId: v.id("users"),
+    debtorName: v.string(),
+    description: v.string(),
+    originalAmount: v.number(),
+    outstandingBalance: v.number(),
+    currencyCode: v.string(),
+    originDate: v.number(),
+    dueDate: v.optional(v.number()),
+    interestRate: v.optional(v.number()),
+    paymentPeriodicity: v.optional(
+      v.union(
+        v.literal("monthly"),
+        v.literal("one_time"),
+        v.literal("irregular")
+      )
+    ),
+    status: v.union(
+      v.literal("active"),
+      v.literal("partially_paid"),
+      v.literal("fully_paid"),
+      v.literal("written_off")
+    ),
+    notes: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_status", ["userId", "status"]),
+
+  fintrack_receivable_payments: defineTable({
+    receivableId: v.id("fintrack_receivables"),
+    userId: v.id("users"),
+    amount: v.number(),
+    paymentDate: v.number(),
+    method: v.string(),
+    note: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_receivable", ["receivableId"])
+    .index("by_user", ["userId"]),
 });
