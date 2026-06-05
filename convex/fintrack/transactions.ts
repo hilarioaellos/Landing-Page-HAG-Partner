@@ -267,3 +267,75 @@ export const remove = mutation({
     await ctx.db.delete(id);
   },
 });
+
+// Creates an expense transaction and a receivable for the shared portion in one atomic step.
+// The full amountCents is recorded as the expense; sharedAmountCents becomes a new receivable.
+// sharedAmountCents must be > 0 and < amountCents.
+export const createShared = mutation({
+  args: {
+    accountId: v.id("fintrack_accounts"),
+    amountCents: v.number(),
+    categoryId: v.optional(v.id("fintrack_categories")),
+    date: v.number(),
+    notes: v.optional(v.string()),
+    sharedAmountCents: v.number(),
+    debtorName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    validatePositiveCents(args.amountCents, "amountCents");
+
+    if (!Number.isInteger(args.sharedAmountCents) || args.sharedAmountCents <= 0)
+      throw new ConvexError("sharedAmountCents must be a positive integer");
+    if (args.sharedAmountCents >= args.amountCents)
+      throw new ConvexError("sharedAmountCents must be less than the total amount");
+    if (!args.debtorName.trim())
+      throw new ConvexError("debtorName is required");
+
+    const account = await ctx.db.get(args.accountId);
+    if (!account || account.userId !== userId)
+      throw new ConvexError({ code: 403, message: "Forbidden" });
+
+    // currencyCode is derived from the account — not trusted from the client
+    const currencyCode = account.currencyCode;
+
+    if (args.categoryId !== undefined) {
+      const cat = await ctx.db.get(args.categoryId);
+      if (!cat || cat.userId !== userId)
+        throw new ConvexError({ code: 403, message: "Forbidden" });
+    }
+
+    const storedAmount = -Math.abs(args.amountCents);
+
+    await ctx.db.insert("fintrack_transactions", {
+      userId,
+      accountId: args.accountId,
+      amountCents: storedAmount,
+      currencyCode,
+      type: "expense",
+      categoryId: args.categoryId,
+      date: args.date,
+      notes: args.notes,
+      isReconciled: false,
+      source: "manual",
+    });
+
+    await applyBalanceDelta(ctx, args.accountId, userId, storedAmount);
+
+    const description = args.notes?.trim()
+      ? `${args.notes.trim()} — shared expense`
+      : `Shared expense (${new Date(args.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })})`;
+
+    await ctx.db.insert("fintrack_receivables", {
+      userId,
+      debtorName: args.debtorName.trim(),
+      description,
+      originalAmount: args.sharedAmountCents,
+      outstandingBalance: args.sharedAmountCents,
+      currencyCode,
+      originDate: args.date,
+      status: "active",
+      createdAt: Date.now(),
+    });
+  },
+});
