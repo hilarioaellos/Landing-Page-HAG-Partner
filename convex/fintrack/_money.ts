@@ -1,5 +1,17 @@
 import { ConvexError } from "convex/values";
 
+export function validateCurrencyCode(code: string): string {
+  const normalized = code.toUpperCase().trim();
+  if (!/^[A-Z]{3}$/.test(normalized))
+    throw new ConvexError("currencyCode must be a 3-letter ISO code (e.g. USD, MXN, EUR)");
+  try {
+    new Intl.NumberFormat("en-US", { style: "currency", currency: normalized });
+  } catch {
+    throw new ConvexError(`"${normalized}" is not a valid ISO 4217 currency code`);
+  }
+  return normalized;
+}
+
 export function validateCents(value: number, field: string): void {
   if (!Number.isFinite(value))
     throw new ConvexError(`${field}: not finite`);

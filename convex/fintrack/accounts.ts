@@ -2,7 +2,7 @@ import { ConvexError } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import { v } from "convex/values";
 import { requireUserId } from "./_auth";
-import { validatePositiveCents } from "./_money";
+import { validatePositiveCents, validateCurrencyCode } from "./_money";
 
 export const list = query({
   args: {},
@@ -48,9 +48,11 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     validatePositiveCents(args.initialBalanceCents, "initialBalanceCents");
+    const currencyCode = validateCurrencyCode(args.currencyCode);
     return ctx.db.insert("fintrack_accounts", {
       userId,
       ...args,
+      currencyCode,
       balanceCents: args.initialBalanceCents,
       isActive: true,
     });
