@@ -17,6 +17,32 @@ export const list = query({
 });
 
 export const netWorthCents = query({
+  args: { currencyCode: v.optional(v.string()) },
+  handler: async (ctx, { currencyCode }) => {
+    const userId = await requireUserId(ctx);
+    let currency: string;
+    if (currencyCode) {
+      currency = validateCurrencyCode(currencyCode);
+    } else {
+      const settings = await ctx.db
+        .query("fintrack_user_settings")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .first();
+      currency = settings?.defaultCurrency ?? "USD";
+    }
+    const accounts = await ctx.db
+      .query("fintrack_accounts")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+    return accounts.reduce((sum, a) => {
+      if (a.currencyCode !== currency) return sum;
+      return a.type === "credit" ? sum - a.balanceCents : sum + a.balanceCents;
+    }, 0);
+  },
+});
+
+export const getDistinctCurrencies = query({
   args: {},
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
@@ -25,9 +51,7 @@ export const netWorthCents = query({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .filter((q) => q.eq(q.field("isActive"), true))
       .collect();
-    return accounts.reduce((sum, a) => {
-      return a.type === "credit" ? sum - a.balanceCents : sum + a.balanceCents;
-    }, 0);
+    return [...new Set(accounts.map((a) => a.currencyCode))].sort();
   },
 });
 

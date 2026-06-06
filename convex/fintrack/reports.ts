@@ -2,6 +2,7 @@ import { ConvexError } from "convex/values";
 import { query } from "../_generated/server";
 import { v } from "convex/values";
 import { requireUserId } from "./_auth";
+import { validateCurrencyCode } from "./_money";
 import type { Id } from "../_generated/dataModel";
 import type { GenericDatabaseReader } from "convex/server";
 import type { DataModel } from "../_generated/dataModel";
@@ -53,17 +54,21 @@ function validateMonths(months: number): void {
 }
 
 export const incomeVsExpenses = query({
-  args: { months: v.optional(v.number()) },
-  handler: async (ctx, { months = 6 }) => {
+  args: { months: v.optional(v.number()), currencyCode: v.optional(v.string()) },
+  handler: async (ctx, { months = 6, currencyCode }) => {
     validateMonths(months);
     const userId = await requireUserId(ctx);
 
-    // Fix 1: filter by user's default currency
-    const settings = await ctx.db
-      .query("fintrack_user_settings")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .first();
-    const currency = settings?.defaultCurrency ?? "USD";
+    let currency: string;
+    if (currencyCode) {
+      currency = validateCurrencyCode(currencyCode);
+    } else {
+      const settings = await ctx.db
+        .query("fintrack_user_settings")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .first();
+      currency = settings?.defaultCurrency ?? "USD";
+    }
 
     const now = new Date();
     const endMs = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime();
@@ -97,17 +102,21 @@ export const incomeVsExpenses = query({
 });
 
 export const expensesByCategory = query({
-  args: { year: v.number(), month: v.number() },
-  handler: async (ctx, { year, month }) => {
+  args: { year: v.number(), month: v.number(), currencyCode: v.optional(v.string()) },
+  handler: async (ctx, { year, month, currencyCode }) => {
     validateReportPeriod(year, month);
     const userId = await requireUserId(ctx);
 
-    // Fix 1: filter by user's default currency
-    const settings = await ctx.db
-      .query("fintrack_user_settings")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .first();
-    const currency = settings?.defaultCurrency ?? "USD";
+    let currency: string;
+    if (currencyCode) {
+      currency = validateCurrencyCode(currencyCode);
+    } else {
+      const settings = await ctx.db
+        .query("fintrack_user_settings")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .first();
+      currency = settings?.defaultCurrency ?? "USD";
+    }
 
     const startMs = new Date(year, month - 1, 1).getTime();
     const endMs = new Date(year, month, 1).getTime();
@@ -146,17 +155,21 @@ export const expensesByCategory = query({
 });
 
 export const cashFlowByDay = query({
-  args: { year: v.number(), month: v.number() },
-  handler: async (ctx, { year, month }) => {
+  args: { year: v.number(), month: v.number(), currencyCode: v.optional(v.string()) },
+  handler: async (ctx, { year, month, currencyCode }) => {
     validateReportPeriod(year, month);
     const userId = await requireUserId(ctx);
 
-    // Fix 1: filter by user's default currency
-    const settings = await ctx.db
-      .query("fintrack_user_settings")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .first();
-    const currency = settings?.defaultCurrency ?? "USD";
+    let currency: string;
+    if (currencyCode) {
+      currency = validateCurrencyCode(currencyCode);
+    } else {
+      const settings = await ctx.db
+        .query("fintrack_user_settings")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .first();
+      currency = settings?.defaultCurrency ?? "USD";
+    }
 
     const startMs = new Date(year, month - 1, 1).getTime();
     const endMs = new Date(year, month, 1).getTime();
@@ -188,16 +201,20 @@ export const cashFlowByDay = query({
 });
 
 export const netWorthSnapshot = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { currencyCode: v.optional(v.string()) },
+  handler: async (ctx, { currencyCode }) => {
     const userId = await requireUserId(ctx);
 
-    // Fix 1: filter by user's default currency
-    const settings = await ctx.db
-      .query("fintrack_user_settings")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .first();
-    const currency = settings?.defaultCurrency ?? "USD";
+    let currency: string;
+    if (currencyCode) {
+      currency = validateCurrencyCode(currencyCode);
+    } else {
+      const settings = await ctx.db
+        .query("fintrack_user_settings")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .first();
+      currency = settings?.defaultCurrency ?? "USD";
+    }
 
     const accounts = await ctx.db
       .query("fintrack_accounts")

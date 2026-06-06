@@ -2,7 +2,7 @@ import { ConvexError } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import { v } from "convex/values";
 import { requireUserId } from "./_auth";
-import { validatePositiveCents } from "./_money";
+import { validatePositiveCents, validateCurrencyCode } from "./_money";
 import { applyBalanceDelta } from "./_balance";
 
 // amountCents = signed delta for accountId:
@@ -49,10 +49,22 @@ export const list = query({
 export const monthlyStats = query({
   args: {
     year: v.number(),
-    month: v.number(), // 1–12
+    month: v.number(),
+    currencyCode: v.optional(v.string()),
   },
-  handler: async (ctx, { year, month }) => {
+  handler: async (ctx, { year, month, currencyCode }) => {
     const userId = await requireUserId(ctx);
+
+    let currency: string | null = null;
+    if (currencyCode) {
+      currency = validateCurrencyCode(currencyCode);
+    } else {
+      const settings = await ctx.db
+        .query("fintrack_user_settings")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .first();
+      currency = settings?.defaultCurrency ?? "USD";
+    }
 
     const startDate = new Date(year, month - 1, 1).getTime();
     const endDate = new Date(year, month, 0, 23, 59, 59, 999).getTime();
@@ -68,6 +80,7 @@ export const monthlyStats = query({
     let expensesCents = 0;
 
     for (const t of transactions) {
+      if (t.currencyCode !== currency) continue;
       if (t.type === "income") incomeCents += t.amountCents;
       else if (t.type === "expense") expensesCents += Math.abs(t.amountCents);
     }
