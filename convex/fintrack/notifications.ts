@@ -92,7 +92,7 @@ export const checkPaymentDueDates = internalMutation({
           await ctx.db.insert("fintrack_notifications", {
             userId: user._id,
             type: "payment_due",
-            message: `Payment due today for ${account.name}`,
+            message: account.name,
             dueDate: today.getTime(),
             isRead: false,
             severity: "urgent",
