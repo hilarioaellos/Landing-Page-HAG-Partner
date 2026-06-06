@@ -49,6 +49,14 @@ async function sha256Hex(input: string): Promise<string> {
     .join("");
 }
 
+type SkippedRow = {
+  date: string;
+  description: string;
+  amountCents: number;
+  type: string;
+  reason: "duplicate" | "transfer_match";
+};
+
 const csvRowValidator = v.object({
   date: v.string(),        // YYYY-MM-DD or MM/DD/YYYY
   description: v.string(),
@@ -94,13 +102,7 @@ export const batchImport = action({
     );
 
     let imported = 0;
-    const skippedRows: {
-      date: string;
-      description: string;
-      amountCents: number;
-      type: string;
-      reason: "duplicate" | "transfer_match";
-    }[] = [];
+    const skippedRows: SkippedRow[] = [];
 
     let partialError: string | undefined;
 
@@ -148,13 +150,7 @@ export const importBatch = internalMutation({
 
     let totalDelta = 0;
     let imported = 0;
-    const skippedRows: {
-      date: string;
-      description: string;
-      amountCents: number;
-      type: string;
-      reason: "duplicate" | "transfer_match";
-    }[] = [];
+    const skippedRows: SkippedRow[] = [];
 
     for (const row of rows) {
       validateCents(row.amountCents, "amountCents");
