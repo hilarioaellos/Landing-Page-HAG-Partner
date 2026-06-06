@@ -102,17 +102,27 @@ export const batchImport = action({
       reason: "duplicate" | "transfer_match";
     }[] = [];
 
+    let partialError: string | undefined;
+
     for (let i = 0; i < rowsWithHashes.length; i += BATCH_SIZE) {
       const batch = rowsWithHashes.slice(i, i + BATCH_SIZE);
-      const result = await ctx.runMutation(
-        internal.fintrack.import.importBatch,
-        { userId, accountId, currencyCode, rows: batch }
-      );
-      imported += result.imported;
-      skippedRows.push(...result.skippedRows);
+      try {
+        const result = await ctx.runMutation(
+          internal.fintrack.import.importBatch,
+          { userId, accountId, currencyCode, rows: batch }
+        );
+        imported += result.imported;
+        skippedRows.push(...result.skippedRows);
+      } catch (err) {
+        const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+        const totalBatches = Math.ceil(rowsWithHashes.length / BATCH_SIZE);
+        const msg = err instanceof Error ? err.message : "unknown error";
+        partialError = `Batch ${batchNum}/${totalBatches} failed: ${msg}`;
+        break;
+      }
     }
 
-    return { imported, skipped: skippedRows.length, skippedRows };
+    return { imported, skipped: skippedRows.length, skippedRows, partialError };
   },
 });
 
