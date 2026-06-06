@@ -28,8 +28,20 @@ const ACTIVE_MODULES = [
   },
 ];
 
+const FINTRACK_URL = process.env.NEXT_PUBLIC_FINTRACK_URL;
+
+const EXTERNAL_MODULES = FINTRACK_URL
+  ? [{
+      key: "fintrack",
+      label: "FinTrack",
+      description: "Personal finance dashboard — accounts, transactions and budgets.",
+      href: FINTRACK_URL,
+      icon: IconWallet,
+    }]
+  : [];
+
 const COMING_SOON = [
-  { key: "finance",    label: "Finance",    description: "Personal accounts, transactions and budgets.", icon: IconWallet },
+  ...(FINTRACK_URL ? [] : [{ key: "finance", label: "Finance", description: "Personal accounts, transactions and budgets.", icon: IconWallet }]),
   { key: "accounting", label: "Accounting", description: "Chart of accounts, journal entries and invoices.", icon: IconLedger },
   { key: "suppliers",  label: "Suppliers",  description: "Vendor management and purchase orders.", icon: IconTruck },
   { key: "documents",  label: "Documents",  description: "Shared file storage and folder management.", icon: IconFolder },
@@ -100,7 +112,36 @@ export default function DashboardPage() {
         </section>
       )}
 
+      {/* External apps (FinTrack) */}
+      {EXTERNAL_MODULES.length > 0 && (
+        <section className="dash-section">
+          <h2 className="dash-section-title">Apps</h2>
+          <div className="dash-grid">
+            {EXTERNAL_MODULES.map(({ key, label, description, href, icon: Icon }) => (
+              <a
+                key={key}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${label} — opens in new tab`}
+                className="dash-card dash-card--active"
+              >
+                <div className="dash-card-icon">
+                  <Icon size={22} />
+                </div>
+                <div className="dash-card-body">
+                  <span className="dash-card-label">{label}</span>
+                  <span className="dash-card-desc">{description}</span>
+                </div>
+                <IconArrow size={16} className="dash-card-arrow" />
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Coming soon */}
+      {COMING_SOON.length > 0 && (
       <section className="dash-section">
         <h2 className="dash-section-title">Coming soon</h2>
         <div className="dash-grid">
@@ -120,6 +161,7 @@ export default function DashboardPage() {
           ))}
         </div>
       </section>
+      )}
 
       <style>{`
         .dash { display: flex; flex-direction: column; gap: 36px; max-width: 900px; }

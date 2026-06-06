@@ -16,8 +16,14 @@ const ACTIVE_MODULES = [
   { key: "profile",   label: "My Profile", href: "/private/profile",icon: IconUser },
 ];
 
+const FINTRACK_URL = process.env.NEXT_PUBLIC_FINTRACK_URL;
+
+const EXTERNAL_MODULES = FINTRACK_URL
+  ? [{ key: "fintrack", label: "FinTrack", href: FINTRACK_URL, icon: IconWallet }]
+  : [];
+
 const COMING_SOON = [
-  { key: "finance",    label: "Finance",    icon: IconWallet },
+  ...(FINTRACK_URL ? [] : [{ key: "finance", label: "Finance", icon: IconWallet }]),
   { key: "accounting", label: "Accounting", icon: IconLedger },
   { key: "suppliers",  label: "Suppliers",  icon: IconTruck },
   { key: "documents",  label: "Documents",  icon: IconFolder },
@@ -61,14 +67,37 @@ export default function Sidebar() {
           );
         })}
 
-        <span className="sidebar-section-label" style={{ marginTop: "20px" }}>Coming soon</span>
-        {COMING_SOON.map(({ key, label, icon: Icon }) => (
-          <div key={key} className="sidebar-item sidebar-item--locked">
-            <Icon size={18} />
-            {label}
-            <span className="sidebar-badge">Soon</span>
-          </div>
-        ))}
+        {EXTERNAL_MODULES.length > 0 && (
+          <>
+            <span className="sidebar-section-label" style={{ marginTop: "20px" }}>Apps</span>
+            {EXTERNAL_MODULES.map(({ key, label, href, icon: Icon }) => (
+              <a
+                key={key}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${label} — opens in new tab`}
+                className="sidebar-item"
+              >
+                <Icon size={18} />
+                {label}
+              </a>
+            ))}
+          </>
+        )}
+
+        {COMING_SOON.length > 0 && (
+          <>
+            <span className="sidebar-section-label" style={{ marginTop: "20px" }}>Coming soon</span>
+            {COMING_SOON.map(({ key, label, icon: Icon }) => (
+              <div key={key} className="sidebar-item sidebar-item--locked">
+                <Icon size={18} />
+                {label}
+                <span className="sidebar-badge">Soon</span>
+              </div>
+            ))}
+          </>
+        )}
       </nav>
 
       <style>{`
