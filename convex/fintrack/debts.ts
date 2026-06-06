@@ -2,19 +2,7 @@ import { ConvexError } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import { v } from "convex/values";
 import { requireUserId } from "./_auth";
-import { validatePositiveCents } from "./_money";
-
-function validateCurrencyCode(code: string): string {
-  const normalized = code.toUpperCase().trim();
-  if (!/^[A-Z]{3}$/.test(normalized))
-    throw new ConvexError("currencyCode must be a 3-letter ISO code (e.g. USD, EUR, MXN)");
-  try {
-    new Intl.NumberFormat("en-US", { style: "currency", currency: normalized });
-  } catch {
-    throw new ConvexError(`currencyCode "${normalized}" is not a supported currency`);
-  }
-  return normalized;
-}
+import { validatePositiveCents, validateCurrencyCode } from "./_money";
 
 export const list = query({
   args: {},
