@@ -7,7 +7,8 @@ import { validateCents } from "./_money";
 
 const BATCH_SIZE = 50;
 
-// Parses YYYY-MM-DD or MM/DD/YYYY. Rejects unknown formats and calendar rollovers.
+// Parses YYYY-MM-DD or MM/DD/YYYY. Frontend normalizes DD/MM/YYYY → YYYY-MM-DD before sending.
+// Rejects unknown formats and calendar rollovers.
 // Uses new Date(y, m, d) (local midnight) to avoid UTC timezone shifts.
 function parseDateSafe(raw: string): number {
   const s = raw.trim();
