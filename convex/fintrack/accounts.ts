@@ -37,7 +37,8 @@ export const netWorthCents = query({
       .collect();
     return accounts.reduce((sum, a) => {
       if (a.currencyCode !== currency) return sum;
-      return a.type === "credit" ? sum - a.balanceCents : sum + a.balanceCents;
+      // Defensive: credit balanceCents should be negative (debt), but use -Math.abs for legacy compat.
+      return sum + (a.type === "credit" ? -Math.abs(a.balanceCents) : a.balanceCents);
     }, 0);
   },
 });
@@ -123,14 +124,16 @@ export const createWithCard = mutation({
     validatePositiveCents(args.creditLimitCents, "creditLimitCents");
     validatePositiveCents(args.minimumPaymentCents, "minimumPaymentCents");
 
+    // Credit: debt is stored as negative. User enters positive ($12,300) → store -1230000.
+    const initialCents = -Math.abs(args.initialBalanceCents);
     const accountId = await ctx.db.insert("fintrack_accounts", {
       userId,
       name: args.name,
       type: "credit",
       currencyCode,
       bankName: args.bankName,
-      initialBalanceCents: args.initialBalanceCents,
-      balanceCents: args.initialBalanceCents,
+      initialBalanceCents: initialCents,
+      balanceCents: initialCents,
       isActive: true,
     });
     await ctx.db.insert("fintrack_credit_cards", {

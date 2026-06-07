@@ -200,6 +200,78 @@ export const cashFlowByDay = query({
   },
 });
 
+// Returns net worth per month for the last N months.
+// Uses initialBalanceCents as baseline + income/expense transactions (transfers excluded — they net to 0).
+// Accounts created after a given month's end are excluded from that month's calculation.
+export const netWorthHistory = query({
+  args: { currencyCode: v.string(), lookbackMonths: v.optional(v.number()) },
+  handler: async (ctx, { currencyCode, lookbackMonths = 12 }) => {
+    const userId = await requireUserId(ctx);
+    const currency = validateCurrencyCode(currencyCode);
+
+    const accounts = await ctx.db
+      .query("fintrack_accounts")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("isActive"), true),
+          q.eq(q.field("currencyCode"), currency)
+        )
+      )
+      .collect();
+
+    if (accounts.length === 0) return [];
+
+    const accountIdSet = new Set(accounts.map((a) => a._id as string));
+
+    // Fetch all transactions for this user — filter client-side to avoid N queries
+    const allTxs = await ctx.db
+      .query("fintrack_transactions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    // Only income/expense for accounts in the target currency (transfers net to 0 for net worth).
+    // Filter by tx.currencyCode as an extra guard against inconsistent data.
+    const relevantTxs = allTxs.filter(
+      (tx) =>
+        accountIdSet.has(tx.accountId as string) &&
+        tx.type !== "transfer" &&
+        tx.currencyCode === currency
+    );
+
+    // Generate month end timestamps and labels
+    const now = new Date();
+    const result: Array<{ label: string; netWorthCents: number }> = [];
+
+    for (let i = lookbackMonths - 1; i >= 0; i--) {
+      // End of the month that is i months ago
+      const endDate = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
+      const endTs = endDate.getTime();
+      const label = new Date(now.getFullYear(), now.getMonth() - i, 1).toLocaleDateString("en-US", {
+        month: "short",
+        year: "2-digit",
+      });
+
+      // Sum initial balances only for accounts that existed at this point.
+      // credit: apply -Math.abs for defensive correctness (legacy accounts may have positive initial).
+      const initialSum = accounts.reduce((sum, a) => {
+        if (a._creationTime > endTs) return sum;
+        const contrib = a.type === "credit" ? -Math.abs(a.initialBalanceCents) : a.initialBalanceCents;
+        return sum + contrib;
+      }, 0);
+
+      // Sum signed transaction amounts up to end of this month
+      const txSum = relevantTxs
+        .filter((tx) => tx.date <= endTs)
+        .reduce((sum, tx) => sum + tx.amountCents, 0);
+
+      result.push({ label, netWorthCents: initialSum + txSum });
+    }
+
+    return result;
+  },
+});
+
 export const netWorthSnapshot = query({
   args: { currencyCode: v.optional(v.string()) },
   handler: async (ctx, { currencyCode }) => {
@@ -226,9 +298,9 @@ export const netWorthSnapshot = query({
     let accountCount = 0;
     for (const acc of accounts) {
       if (acc.currencyCode !== currency) continue;
-      // Fix 2: balanceCents is already signed — credit accounts carry negative balance (debt).
-      // No sign inversion needed: adding balanceCents directly gives correct net worth.
-      totalCents += acc.balanceCents;
+      // credit: balanceCents should be negative (debt), but legacy accounts may have positive
+      // initialBalanceCents. Use -Math.abs for defensive correctness.
+      totalCents += acc.type === "credit" ? -Math.abs(acc.balanceCents) : acc.balanceCents;
       accountCount++;
     }
 
