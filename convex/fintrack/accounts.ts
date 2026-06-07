@@ -101,6 +101,99 @@ export const update = mutation({
   },
 });
 
+// Creates a credit account + card record atomically in a single mutation.
+export const createWithCard = mutation({
+  args: {
+    name: v.string(),
+    currencyCode: v.string(),
+    bankName: v.optional(v.string()),
+    initialBalanceCents: v.number(),
+    closingDay: v.number(),
+    paymentDueDay: v.number(),
+    creditLimitCents: v.number(),
+    minimumPaymentCents: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const currencyCode = validateCurrencyCode(args.currencyCode);
+    if (!Number.isInteger(args.closingDay) || args.closingDay < 1 || args.closingDay > 28)
+      throw new ConvexError("closingDay must be an integer between 1 and 28");
+    if (!Number.isInteger(args.paymentDueDay) || args.paymentDueDay < 1 || args.paymentDueDay > 28)
+      throw new ConvexError("paymentDueDay must be an integer between 1 and 28");
+    validatePositiveCents(args.creditLimitCents, "creditLimitCents");
+    validatePositiveCents(args.minimumPaymentCents, "minimumPaymentCents");
+
+    const accountId = await ctx.db.insert("fintrack_accounts", {
+      userId,
+      name: args.name,
+      type: "credit",
+      currencyCode,
+      bankName: args.bankName,
+      initialBalanceCents: args.initialBalanceCents,
+      balanceCents: args.initialBalanceCents,
+      isActive: true,
+    });
+    await ctx.db.insert("fintrack_credit_cards", {
+      userId,
+      accountId,
+      closingDay: args.closingDay,
+      paymentDueDay: args.paymentDueDay,
+      creditLimitCents: args.creditLimitCents,
+      minimumPaymentCents: args.minimumPaymentCents,
+    });
+    return accountId;
+  },
+});
+
+// Updates a credit account + card record atomically in a single mutation.
+export const updateWithCard = mutation({
+  args: {
+    id: v.id("fintrack_accounts"),
+    name: v.optional(v.string()),
+    bankName: v.optional(v.string()),
+    closingDay: v.number(),
+    paymentDueDay: v.number(),
+    creditLimitCents: v.number(),
+    minimumPaymentCents: v.number(),
+  },
+  handler: async (ctx, { id, closingDay, paymentDueDay, creditLimitCents, minimumPaymentCents, ...fields }) => {
+    const userId = await requireUserId(ctx);
+    const account = await ctx.db.get(id);
+    if (!account || account.userId !== userId)
+      throw new ConvexError({ code: 403, message: "Forbidden" });
+    if (account.type !== "credit")
+      throw new ConvexError("Account must be of type 'credit'");
+    if (!Number.isInteger(closingDay) || closingDay < 1 || closingDay > 28)
+      throw new ConvexError("closingDay must be an integer between 1 and 28");
+    if (!Number.isInteger(paymentDueDay) || paymentDueDay < 1 || paymentDueDay > 28)
+      throw new ConvexError("paymentDueDay must be an integer between 1 and 28");
+    validatePositiveCents(creditLimitCents, "creditLimitCents");
+    validatePositiveCents(minimumPaymentCents, "minimumPaymentCents");
+
+    const patch = Object.fromEntries(
+      Object.entries(fields).filter(([, val]) => val !== undefined)
+    );
+    if (Object.keys(patch).length > 0) await ctx.db.patch(id, patch);
+
+    const existingCard = await ctx.db
+      .query("fintrack_credit_cards")
+      .withIndex("by_account", (q) => q.eq("accountId", id))
+      .first();
+    if (existingCard) {
+      await ctx.db.patch(existingCard._id, { closingDay, paymentDueDay, creditLimitCents, minimumPaymentCents });
+    } else {
+      await ctx.db.insert("fintrack_credit_cards", {
+        userId,
+        accountId: id,
+        closingDay,
+        paymentDueDay,
+        creditLimitCents,
+        minimumPaymentCents,
+      });
+    }
+  },
+});
+
 export const archive = mutation({
   args: { id: v.id("fintrack_accounts") },
   handler: async (ctx, { id }) => {
