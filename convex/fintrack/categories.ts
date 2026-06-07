@@ -44,6 +44,32 @@ export const list = query({
   },
 });
 
+// Returns categories with their settings merged (isActive, excludeFromReports from DB)
+export const listWithSettings = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+
+    const cats = await ctx.db
+      .query("fintrack_categories")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    const settings = await ctx.db
+      .query("fintrack_category_settings")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    const settingsMap = new Map(settings.map((s) => [s.categoryId as string, s]));
+
+    return cats.map((cat) => ({
+      ...cat,
+      isActive: settingsMap.get(cat._id)?.isActive ?? true,
+      excludeFromReports: settingsMap.get(cat._id)?.excludeFromReports ?? false,
+    }));
+  },
+});
+
 // Returns categories the user has marked active.
 // Falls back to all categories if settings have never been initialized
 // (backward compat for existing users).
@@ -170,6 +196,103 @@ export const updateSetting = mutation({
         excludeFromReports: args.excludeFromReports ?? false,
       });
     }
+  },
+});
+
+export const update = mutation({
+  args: {
+    id: v.id("fintrack_categories"),
+    name: v.optional(v.string()),
+    icon: v.optional(v.string()),
+    color: v.optional(v.string()),
+  },
+  handler: async (ctx, { id, name, icon, color }) => {
+    const userId = await requireUserId(ctx);
+    const cat = await ctx.db.get(id);
+    if (!cat || cat.userId !== userId)
+      throw new ConvexError({ code: 403, message: "Forbidden" });
+    if (cat.isSystem)
+      throw new ConvexError("System categories cannot be renamed");
+    if (name !== undefined && !name.trim())
+      throw new ConvexError("Name is required");
+
+    const patch: Record<string, unknown> = {};
+    if (name !== undefined) patch.name = name.trim();
+    if (icon !== undefined) patch.icon = icon;
+    if (color !== undefined) patch.color = color;
+    if (Object.keys(patch).length > 0) await ctx.db.patch(id, patch);
+  },
+});
+
+export const remove = mutation({
+  args: { id: v.id("fintrack_categories") },
+  handler: async (ctx, { id }) => {
+    const userId = await requireUserId(ctx);
+    const cat = await ctx.db.get(id);
+    if (!cat || cat.userId !== userId)
+      throw new ConvexError({ code: 403, message: "Forbidden" });
+    if (cat.isSystem)
+      throw new ConvexError("System categories cannot be deleted");
+
+    // 1. Transactions: clear optional categoryId
+    const txs = await ctx.db
+      .query("fintrack_transactions")
+      .withIndex("by_category", (q) => q.eq("userId", userId).eq("categoryId", id))
+      .collect();
+    for (const tx of txs) await ctx.db.patch(tx._id, { categoryId: undefined });
+
+    // 2. Budgets: delete (categoryId is required — row has no meaning without category)
+    const budgets = await ctx.db
+      .query("fintrack_budgets")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    for (const b of budgets) {
+      if (b.categoryId === id) await ctx.db.delete(b._id);
+    }
+
+    // 3. Transaction splits: delete splits where categoryId matches; clear subcategoryId
+    const splits = await ctx.db
+      .query("fintrack_transaction_splits")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    for (const s of splits) {
+      if (s.categoryId === id) { await ctx.db.delete(s._id); continue; }
+      if (s.subcategoryId === id) await ctx.db.patch(s._id, { subcategoryId: undefined });
+    }
+
+    // 4. Subscriptions: clear optional categoryId
+    const subs = await ctx.db
+      .query("fintrack_subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    for (const s of subs) {
+      if (s.categoryId === id) await ctx.db.patch(s._id, { categoryId: undefined });
+    }
+
+    // 5. Merchants: clear optional defaultCategoryId
+    const merchants = await ctx.db
+      .query("fintrack_merchants")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    for (const m of merchants) {
+      if (m.defaultCategoryId === id) await ctx.db.patch(m._id, { defaultCategoryId: undefined });
+    }
+
+    // 6. Child categories: clear parentId (reparent to root)
+    const children = await ctx.db
+      .query("fintrack_categories")
+      .withIndex("by_parent", (q) => q.eq("parentId", id))
+      .collect();
+    for (const c of children) await ctx.db.patch(c._id, { parentId: undefined });
+
+    // 7. Category settings
+    const settings = await ctx.db
+      .query("fintrack_category_settings")
+      .withIndex("by_user_category", (q) => q.eq("userId", userId).eq("categoryId", id))
+      .first();
+    if (settings) await ctx.db.delete(settings._id);
+
+    await ctx.db.delete(id);
   },
 });
 
