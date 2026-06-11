@@ -9,7 +9,7 @@ const BATCH_SIZE = 50;
 
 // Parses YYYY-MM-DD or MM/DD/YYYY. Frontend normalizes DD/MM/YYYY → YYYY-MM-DD before sending.
 // Rejects unknown formats and calendar rollovers.
-// Uses new Date(y, m, d) (local midnight) to avoid UTC timezone shifts.
+// Stores at UTC noon so the correct calendar date is preserved across US timezones (UTC-12 to UTC+11).
 function parseDateSafe(raw: string): number {
   const s = raw.trim();
 
@@ -18,10 +18,10 @@ function parseDateSafe(raw: string): number {
     const y = parseInt(isoMatch[1], 10);
     const m = parseInt(isoMatch[2], 10);
     const d = parseInt(isoMatch[3], 10);
-    const date = new Date(y, m - 1, d);
-    if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d)
+    const check = new Date(Date.UTC(y, m - 1, d));
+    if (check.getUTCFullYear() !== y || check.getUTCMonth() !== m - 1 || check.getUTCDate() !== d)
       throw new ConvexError(`Invalid date: ${raw}`);
-    return date.getTime();
+    return Date.UTC(y, m - 1, d, 12, 0, 0);
   }
 
   const usMatch = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
@@ -29,10 +29,10 @@ function parseDateSafe(raw: string): number {
     const m = parseInt(usMatch[1], 10);
     const d = parseInt(usMatch[2], 10);
     const y = parseInt(usMatch[3], 10);
-    const date = new Date(y, m - 1, d);
-    if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d)
+    const check = new Date(Date.UTC(y, m - 1, d));
+    if (check.getUTCFullYear() !== y || check.getUTCMonth() !== m - 1 || check.getUTCDate() !== d)
       throw new ConvexError(`Invalid date: ${raw}`);
-    return date.getTime();
+    return Date.UTC(y, m - 1, d, 12, 0, 0);
   }
 
   throw new ConvexError(
@@ -62,6 +62,7 @@ const csvRowValidator = v.object({
   description: v.string(),
   amountCents: v.number(), // absolute value — sign derived from type
   type: v.union(v.literal("income"), v.literal("expense")),
+  categoryId: v.optional(v.id("fintrack_categories")),
 });
 
 export const batchImport = action({
@@ -97,7 +98,7 @@ export const batchImport = action({
         const hash = await sha256Hex(
           `${accountId}|${row.date}|${storedAmount}|${normalizedDesc}`
         );
-        return { ...row, amountCents: storedAmount, importHash: hash };
+        return { ...row, amountCents: storedAmount, importHash: hash, categoryId: row.categoryId };
       })
     );
 
@@ -140,6 +141,7 @@ export const importBatch = internalMutation({
         amountCents: v.number(), // already signed (negative for expense)
         type: v.union(v.literal("income"), v.literal("expense")),
         importHash: v.string(),
+        categoryId: v.optional(v.id("fintrack_categories")),
       })
     ),
   },
@@ -206,6 +208,7 @@ export const importBatch = internalMutation({
         source: "csv",
         isReconciled: false,
         importHash: row.importHash,
+        ...(row.categoryId !== undefined && { categoryId: row.categoryId }),
       });
 
       totalDelta += row.amountCents;
