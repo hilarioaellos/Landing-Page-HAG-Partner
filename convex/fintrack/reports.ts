@@ -102,8 +102,17 @@ export const incomeVsExpenses = query({
 });
 
 export const expensesByCategory = query({
-  args: { year: v.number(), month: v.number(), currencyCode: v.optional(v.string()) },
-  handler: async (ctx, { year, month, currencyCode }) => {
+  args: {
+    year: v.number(),
+    month: v.number(),
+    currencyCode: v.optional(v.string()),
+    txType: v.optional(v.union(v.literal("income"), v.literal("expense"))),
+    // Client passes local-time boundaries so transactions near midnight UTC are
+    // bucketed by the date the user sees, not by the server's UTC clock.
+    startMs: v.optional(v.number()),
+    endMs: v.optional(v.number()),
+  },
+  handler: async (ctx, { year, month, currencyCode, txType = "expense", startMs: clientStart, endMs: clientEnd }) => {
     validateReportPeriod(year, month);
     const userId = await requireUserId(ctx);
 
@@ -118,8 +127,8 @@ export const expensesByCategory = query({
       currency = settings?.defaultCurrency ?? "USD";
     }
 
-    const startMs = new Date(year, month - 1, 1).getTime();
-    const endMs = new Date(year, month, 1).getTime();
+    const startMs = clientStart ?? new Date(year, month - 1, 1).getTime();
+    const endMs   = clientEnd   ?? new Date(year, month, 1).getTime();
 
     const excluded = await getExcludedCategoryIds(ctx.db, userId);
 
@@ -132,23 +141,34 @@ export const expensesByCategory = query({
 
     const totals: Record<string, number> = {};
     for (const tx of txs) {
-      if (tx.type !== "expense" || !tx.categoryId || tx.currencyCode !== currency) continue;
+      if (tx.type !== txType || !tx.categoryId || tx.currencyCode !== currency) continue;
       if (excluded.has(tx.categoryId)) continue;
       totals[tx.categoryId] = (totals[tx.categoryId] ?? 0) + Math.abs(tx.amountCents);
     }
 
-    const entries = await Promise.all(
-      Object.entries(totals).map(async ([catId, totalCents]) => {
-        const cat = await ctx.db.get(catId as Id<"fintrack_categories">);
-        return {
-          categoryId: catId,
-          name: cat?.name ?? "Unknown",
-          icon: cat?.icon ?? "📦",
-          color: cat?.color ?? "#94a3b8",
-          totalCents,
-        };
-      })
-    );
+    const entries: Array<{ categoryId: string; name: string; icon: string; color: string; totalCents: number }> =
+      await Promise.all(
+        Object.entries(totals).map(async ([catId, totalCents]) => {
+          const cat = await ctx.db.get(catId as Id<"fintrack_categories">);
+          return {
+            categoryId: catId,
+            name: cat?.name ?? "Unknown",
+            icon: cat?.icon ?? "📦",
+            color: cat?.color ?? "#94a3b8",
+            totalCents,
+          };
+        })
+      );
+
+    // Bucket for transactions without a category
+    let uncatCents = 0;
+    for (const tx of txs) {
+      if (tx.type !== txType || tx.categoryId || tx.currencyCode !== currency) continue;
+      uncatCents += Math.abs(tx.amountCents);
+    }
+    if (uncatCents > 0) {
+      entries.push({ categoryId: "__none__", name: "__none__", icon: "🏷️", color: "#64748b", totalCents: uncatCents });
+    }
 
     return entries.sort((a, b) => b.totalCents - a.totalCents);
   },

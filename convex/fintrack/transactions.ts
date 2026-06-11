@@ -51,8 +51,12 @@ export const monthlyStats = query({
     year: v.number(),
     month: v.number(),
     currencyCode: v.optional(v.string()),
+    // Client passes local-time boundaries so transactions near midnight UTC are
+    // bucketed by the date the user sees, not by the server's UTC clock.
+    startMs: v.optional(v.number()),
+    endMs: v.optional(v.number()),
   },
-  handler: async (ctx, { year, month, currencyCode }) => {
+  handler: async (ctx, { year, month, currencyCode, startMs: clientStart, endMs: clientEnd }) => {
     const userId = await requireUserId(ctx);
 
     let currency: string | null = null;
@@ -66,8 +70,8 @@ export const monthlyStats = query({
       currency = settings?.defaultCurrency ?? "USD";
     }
 
-    const startDate = new Date(year, month - 1, 1).getTime();
-    const endDate = new Date(year, month, 0, 23, 59, 59, 999).getTime();
+    const startDate = clientStart ?? new Date(year, month - 1, 1).getTime();
+    const endDate   = clientEnd   ?? new Date(year, month, 0, 23, 59, 59, 999).getTime();
 
     const transactions = await ctx.db
       .query("fintrack_transactions")
@@ -350,5 +354,60 @@ export const createShared = mutation({
       status: "active",
       createdAt: Date.now(),
     });
+  },
+});
+
+// Deletes all transactions for a given account and resets its balance to initialBalanceCents.
+export const clearByAccount = mutation({
+  args: { accountId: v.id("fintrack_accounts") },
+  handler: async (ctx, { accountId }) => {
+    const userId = await requireUserId(ctx);
+    const account = await ctx.db.get(accountId);
+    if (!account || account.userId !== userId)
+      throw new ConvexError({ code: 403, message: "Forbidden" });
+
+    const txs = await ctx.db
+      .query("fintrack_transactions")
+      .withIndex("by_account", (q) => q.eq("accountId", accountId))
+      .collect();
+
+    for (const tx of txs) await ctx.db.delete(tx._id);
+
+    await ctx.db.patch(accountId, { balanceCents: account.initialBalanceCents });
+
+    return { deleted: txs.length };
+  },
+});
+
+// Returns a map of { normalizedDescription → most-common categoryId } built from
+// the user's existing categorized transactions. Used by the CSV import to pre-fill
+// category suggestions before the user confirms the import.
+export const suggestCategories = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+
+    const txs = await ctx.db
+      .query("fintrack_transactions")
+      .withIndex("by_date", (q) => q.eq("userId", userId))
+      .collect();
+
+    // Count how many times each (normalizedDesc, categoryId) pair appears
+    const counts: Record<string, Record<string, number>> = {};
+    for (const tx of txs) {
+      if (!tx.categoryId || !tx.notes) continue;
+      const desc = tx.notes.trim().toLowerCase();
+      if (!counts[desc]) counts[desc] = {};
+      const catId = tx.categoryId as string;
+      counts[desc][catId] = (counts[desc][catId] ?? 0) + 1;
+    }
+
+    // Keep only the most-common category per description
+    const result: Record<string, string> = {};
+    for (const [desc, catCounts] of Object.entries(counts)) {
+      const best = Object.entries(catCounts).sort((a, b) => b[1] - a[1])[0];
+      if (best) result[desc] = best[0];
+    }
+    return result;
   },
 });
