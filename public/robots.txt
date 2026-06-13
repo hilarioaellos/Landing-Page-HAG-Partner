@@ -1,0 +1,22 @@
+User-agent: *
+Allow: /
+Disallow: /private/
+Disallow: /sign-in
+Disallow: /sign-up
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+Sitemap: https://hagpartner.com/sitemap.xml
