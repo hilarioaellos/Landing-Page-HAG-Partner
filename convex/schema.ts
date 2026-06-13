@@ -531,6 +531,7 @@ export default defineSchema({
     defaultCurrency: v.string(),
     dashboardWidgets: v.optional(v.string()),
     theme: v.optional(v.string()),
+    categoriesReviewed: v.optional(v.boolean()),
   }).index("by_user", ["userId"]),
 
   // ============ A1 — SUSCRIPCIONES ============

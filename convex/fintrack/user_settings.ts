@@ -71,6 +71,15 @@ export const clearUserData = mutation({
       if (!r.isSystem) await ctx.db.delete(r._id);
     }
 
+    // 16. Reset categoriesReviewed so wizard re-opens on next session
+    const userSettings = await ctx.db
+      .query("fintrack_user_settings")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+    if (userSettings) {
+      await ctx.db.patch(userSettings._id, { categoriesReviewed: false });
+    }
+
     // Kept intentionally:
     // - fintrack_user_settings (language/currency/theme preferences)
     // - fintrack_categories where isSystem === true (system seed categories)
@@ -105,6 +114,27 @@ export const get = query({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .first();
     return settings || { userId, defaultCurrency: "USD" };
+  },
+});
+
+export const markCategoriesReviewed = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+    const existing = await ctx.db
+      .query("fintrack_user_settings")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, { categoriesReviewed: true });
+    } else {
+      await ctx.db.insert("fintrack_user_settings", {
+        userId,
+        defaultCurrency: "USD",
+        categoriesReviewed: true,
+      });
+    }
   },
 });
 

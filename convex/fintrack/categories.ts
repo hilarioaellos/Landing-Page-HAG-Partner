@@ -4,32 +4,34 @@ import { v } from "convex/values";
 import { requireUserId } from "./_auth";
 
 const SYSTEM_CATEGORIES = [
-  // Gastos
-  { name: "Groceries",          icon: "🛒", color: "#2ecc71" },
-  { name: "Restaurants",        icon: "🍽️", color: "#f39c12" },
-  { name: "Transportation",     icon: "🚗", color: "#3498db" },
-  { name: "Utilities",          icon: "⚡", color: "#e74c3c" },
-  { name: "Entertainment",      icon: "🎮", color: "#9b59b6" },
-  { name: "Shopping",           icon: "🛍️", color: "#1abc9c" },
-  { name: "Healthcare",         icon: "🏥", color: "#c0392b" },
-  { name: "Insurance",          icon: "🛡️", color: "#34495e" },
-  { name: "Rent",               icon: "🏠", color: "#16a085" },
-  { name: "Gym",                icon: "💪", color: "#e67e22" },
-  { name: "Phone",              icon: "📱", color: "#2980b9" },
-  { name: "Travel",             icon: "✈️", color: "#8e44ad" },
-  { name: "Subscriptions",      icon: "🔄", color: "#1bbc9b" },
-  { name: "Gifts",              icon: "🎁", color: "#d35400" },
-  { name: "Pets",               icon: "🐕", color: "#27ae60" },
-  { name: "Books",              icon: "📚", color: "#3498db" },
-  { name: "Other",              icon: "🏷️", color: "#7f8c8d" },
-  // Ingresos
+  // Expenses
+  { name: "Groceries",       icon: "🛒", color: "#2ecc71" },
+  { name: "Restaurants",     icon: "🍽️", color: "#f39c12" },
+  { name: "Transportation",  icon: "🚗", color: "#3498db" },
+  { name: "Allowance",       icon: "💰", color: "#e67e22" },
+  { name: "Utilities",       icon: "⚡", color: "#e74c3c" },
+  { name: "Entertainment",   icon: "🎬", color: "#9b59b6" },
+  { name: "Shopping",        icon: "🛍️", color: "#1abc9c" },
+  { name: "Healthcare",      icon: "🏥", color: "#c0392b" },
+  { name: "Insurance",       icon: "🛡️", color: "#34495e" },
+  { name: "Mortgage/Rent",   icon: "🏠", color: "#16a085" },
+  { name: "Home",            icon: "🏡", color: "#27ae60" },
+  { name: "Travel",          icon: "✈️", color: "#8e44ad" },
+  { name: "Gifts",           icon: "🎁", color: "#d35400" },
+  { name: "Education",       icon: "📚", color: "#2980b9" },
+  { name: "Personal Care",   icon: "💅", color: "#e91e8c" },
+  { name: "Other",           icon: "🏷️", color: "#7f8c8d" },
+  { name: "Technology",         icon: "🖥️", color: "#0ea5e9" },
+  { name: "Finances",           icon: "💳", color: "#64748b" },
+  // Income
   { name: "Salary",             icon: "💼", color: "#27ae60" },
   { name: "Freelance",          icon: "💻", color: "#2980b9" },
+  { name: "Gift Income",        icon: "🎁", color: "#e74c3c" },
   { name: "Bonus",              icon: "🎉", color: "#f39c12" },
   { name: "Investment Returns", icon: "📈", color: "#16a085" },
-  { name: "Gift Income",        icon: "🎁", color: "#e74c3c" },
-  { name: "Rental Income",      icon: "🏠", color: "#8e44ad" },
-  { name: "Other Income",       icon: "🏷️", color: "#95a5a6" },
+  { name: "Rental Income",      icon: "🏘️", color: "#8e44ad" },
+  { name: "Business Income",    icon: "🏢", color: "#0891b2" },
+  { name: "IRIS",               icon: "👤", color: "#7c3aed" },
 ];
 
 // Returns all categories for the current user
@@ -100,11 +102,18 @@ export const listActive = query({
 });
 
 // Idempotent — seeds only categories not yet present by name.
-// Safe to call on every mount.
+// Skips entirely if the user has already reviewed their categories.
 export const seed = mutation({
   args: {},
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
+
+    const settings = await ctx.db
+      .query("fintrack_user_settings")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+    if (settings?.categoriesReviewed === true) return;
+
     const existing = await ctx.db
       .query("fintrack_categories")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -224,6 +233,72 @@ export const update = mutation({
   },
 });
 
+async function _deleteCategory(
+  ctx: { db: { get: Function; query: Function; patch: Function; delete: Function } },
+  userId: string,
+  id: string
+) {
+  // 1. Transactions: clear optional categoryId
+  const txs = await ctx.db
+    .query("fintrack_transactions")
+    .withIndex("by_category", (q: any) => q.eq("userId", userId).eq("categoryId", id))
+    .collect();
+  for (const tx of txs) await ctx.db.patch(tx._id, { categoryId: undefined });
+
+  // 2. Budgets: delete (categoryId is required — row has no meaning without category)
+  const budgets = await ctx.db
+    .query("fintrack_budgets")
+    .withIndex("by_user", (q: any) => q.eq("userId", userId))
+    .collect();
+  for (const b of budgets) {
+    if (b.categoryId === id) await ctx.db.delete(b._id);
+  }
+
+  // 3. Transaction splits: delete splits where categoryId matches; clear subcategoryId
+  const splits = await ctx.db
+    .query("fintrack_transaction_splits")
+    .withIndex("by_user", (q: any) => q.eq("userId", userId))
+    .collect();
+  for (const s of splits) {
+    if (s.categoryId === id) { await ctx.db.delete(s._id); continue; }
+    if (s.subcategoryId === id) await ctx.db.patch(s._id, { subcategoryId: undefined });
+  }
+
+  // 4. Subscriptions: clear optional categoryId
+  const subs = await ctx.db
+    .query("fintrack_subscriptions")
+    .withIndex("by_user", (q: any) => q.eq("userId", userId))
+    .collect();
+  for (const s of subs) {
+    if (s.categoryId === id) await ctx.db.patch(s._id, { categoryId: undefined });
+  }
+
+  // 5. Merchants: clear optional defaultCategoryId
+  const merchants = await ctx.db
+    .query("fintrack_merchants")
+    .withIndex("by_user", (q: any) => q.eq("userId", userId))
+    .collect();
+  for (const m of merchants) {
+    if (m.defaultCategoryId === id) await ctx.db.patch(m._id, { defaultCategoryId: undefined });
+  }
+
+  // 6. Child categories: clear parentId (reparent to root)
+  const children = await ctx.db
+    .query("fintrack_categories")
+    .withIndex("by_parent", (q: any) => q.eq("parentId", id))
+    .collect();
+  for (const c of children) await ctx.db.patch(c._id, { parentId: undefined });
+
+  // 7. Category settings
+  const catSettings = await ctx.db
+    .query("fintrack_category_settings")
+    .withIndex("by_user_category", (q: any) => q.eq("userId", userId).eq("categoryId", id))
+    .first();
+  if (catSettings) await ctx.db.delete(catSettings._id);
+
+  await ctx.db.delete(id);
+}
+
 export const remove = mutation({
   args: { id: v.id("fintrack_categories") },
   handler: async (ctx, { id }) => {
@@ -231,68 +306,31 @@ export const remove = mutation({
     const cat = await ctx.db.get(id);
     if (!cat || cat.userId !== userId)
       throw new ConvexError({ code: 403, message: "Forbidden" });
-    if (cat.isSystem)
-      throw new ConvexError("System categories cannot be deleted");
 
-    // 1. Transactions: clear optional categoryId
-    const txs = await ctx.db
-      .query("fintrack_transactions")
-      .withIndex("by_category", (q) => q.eq("userId", userId).eq("categoryId", id))
-      .collect();
-    for (const tx of txs) await ctx.db.patch(tx._id, { categoryId: undefined });
+    await _deleteCategory(ctx, userId, id);
+  },
+});
 
-    // 2. Budgets: delete (categoryId is required — row has no meaning without category)
-    const budgets = await ctx.db
-      .query("fintrack_budgets")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .collect();
-    for (const b of budgets) {
-      if (b.categoryId === id) await ctx.db.delete(b._id);
-    }
+// Removes isSystem categories that are no longer in the canonical SYSTEM_CATEGORIES list.
+// Idempotent — safe to call on every session start.
+export const cleanLegacySystemCategories = mutation({
+  args: {},
+  handler: async (ctx): Promise<{ deleted: number }> => {
+    const userId = await requireUserId(ctx);
 
-    // 3. Transaction splits: delete splits where categoryId matches; clear subcategoryId
-    const splits = await ctx.db
-      .query("fintrack_transaction_splits")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .collect();
-    for (const s of splits) {
-      if (s.categoryId === id) { await ctx.db.delete(s._id); continue; }
-      if (s.subcategoryId === id) await ctx.db.patch(s._id, { subcategoryId: undefined });
-    }
-
-    // 4. Subscriptions: clear optional categoryId
-    const subs = await ctx.db
-      .query("fintrack_subscriptions")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .collect();
-    for (const s of subs) {
-      if (s.categoryId === id) await ctx.db.patch(s._id, { categoryId: undefined });
-    }
-
-    // 5. Merchants: clear optional defaultCategoryId
-    const merchants = await ctx.db
-      .query("fintrack_merchants")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .collect();
-    for (const m of merchants) {
-      if (m.defaultCategoryId === id) await ctx.db.patch(m._id, { defaultCategoryId: undefined });
-    }
-
-    // 6. Child categories: clear parentId (reparent to root)
-    const children = await ctx.db
+    const all = await ctx.db
       .query("fintrack_categories")
-      .withIndex("by_parent", (q) => q.eq("parentId", id))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
-    for (const c of children) await ctx.db.patch(c._id, { parentId: undefined });
 
-    // 7. Category settings
-    const settings = await ctx.db
-      .query("fintrack_category_settings")
-      .withIndex("by_user_category", (q) => q.eq("userId", userId).eq("categoryId", id))
-      .first();
-    if (settings) await ctx.db.delete(settings._id);
+    const canonicalNames = new Set(SYSTEM_CATEGORIES.map((c) => c.name));
+    const legacy = all.filter((c) => c.isSystem && !canonicalNames.has(c.name));
 
-    await ctx.db.delete(id);
+    for (const cat of legacy) {
+      await _deleteCategory(ctx, userId, cat._id);
+    }
+
+    return { deleted: legacy.length };
   },
 });
 
