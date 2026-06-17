@@ -428,9 +428,15 @@ export const suggestCategories = query({
       counts[desc][catId] = (counts[desc][catId] ?? 0) + 1;
     }
 
-    // Keep only the most-common category per description
+    // Sort descriptions by total appearance count, keep top 1000 (Convex limit: 1024 object fields)
+    const sorted = Object.entries(counts).sort((a, b) => {
+      const sumA = Object.values(a[1]).reduce((s, n) => s + n, 0);
+      const sumB = Object.values(b[1]).reduce((s, n) => s + n, 0);
+      return sumB - sumA;
+    });
+
     const result: Record<string, string> = {};
-    for (const [desc, catCounts] of Object.entries(counts)) {
+    for (const [desc, catCounts] of sorted.slice(0, 1000)) {
       const best = Object.entries(catCounts).sort((a, b) => b[1] - a[1])[0];
       if (best) result[desc] = best[0];
     }
