@@ -379,6 +379,32 @@ export const clearByAccount = mutation({
   },
 });
 
+// Updates the categoryId on multiple transactions at once. Validates ownership for each.
+export const bulkUpdateCategory = mutation({
+  args: {
+    ids: v.array(v.id("fintrack_transactions")),
+    categoryId: v.optional(v.id("fintrack_categories")),
+  },
+  handler: async (ctx, { ids, categoryId }) => {
+    const userId = await requireUserId(ctx);
+
+    if (categoryId !== undefined) {
+      const cat = await ctx.db.get(categoryId);
+      if (!cat || cat.userId !== userId)
+        throw new ConvexError({ code: 403, message: "Forbidden" });
+    }
+
+    let updated = 0;
+    for (const id of ids) {
+      const tx = await ctx.db.get(id);
+      if (!tx || tx.userId !== userId) continue;
+      await ctx.db.patch(id, { categoryId });
+      updated++;
+    }
+    return { updated };
+  },
+});
+
 // Returns a map of { normalizedDescription → most-common categoryId } built from
 // the user's existing categorized transactions. Used by the CSV import to pre-fill
 // category suggestions before the user confirms the import.

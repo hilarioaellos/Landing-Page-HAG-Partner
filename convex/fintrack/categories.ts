@@ -32,6 +32,8 @@ const SYSTEM_CATEGORIES = [
   { name: "Rental Income",      icon: "🏘️", color: "#8e44ad" },
   { name: "Business Income",    icon: "🏢", color: "#0891b2" },
   { name: "IRIS",               icon: "👤", color: "#7c3aed" },
+  // Neutral — used to tag imported transactions that are internal transfers
+  { name: "Transfers",          icon: "🔄", color: "#0ea5e9" },
 ];
 
 // Returns all categories for the current user
@@ -130,6 +132,60 @@ export const seed = mutation({
           color: cat.color,
           isSystem: true,
         });
+      }
+    }
+  },
+});
+
+// Idempotent — ensures all SYSTEM_CATEGORIES exist for the user, even if they
+// were added after the initial seed. Safe to call on every session start.
+// Unlike `seed`, does NOT skip when categoriesReviewed === true.
+export const ensureSystemCategories = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+
+    const existing = await ctx.db
+      .query("fintrack_categories")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    const byName = new Map(existing.map((c) => [c.name, c]));
+
+    for (const cat of SYSTEM_CATEGORIES) {
+      const match = byName.get(cat.name);
+      if (!match) {
+        // Create missing system category
+        const catId = await ctx.db.insert("fintrack_categories", {
+          userId,
+          name: cat.name,
+          icon: cat.icon,
+          color: cat.color,
+          isSystem: true,
+        });
+        await ctx.db.insert("fintrack_category_settings", {
+          userId,
+          categoryId: catId,
+          isActive: true,
+          excludeFromReports: false,
+        });
+      } else if (!match.isSystem) {
+        // Promote existing custom category with same name to system
+        await ctx.db.patch(match._id, { isSystem: true, icon: cat.icon, color: cat.color });
+        const setting = await ctx.db
+          .query("fintrack_category_settings")
+          .withIndex("by_user_category", (q) =>
+            q.eq("userId", userId).eq("categoryId", match._id)
+          )
+          .first();
+        if (!setting) {
+          await ctx.db.insert("fintrack_category_settings", {
+            userId,
+            categoryId: match._id,
+            isActive: true,
+            excludeFromReports: false,
+          });
+        }
       }
     }
   },
@@ -306,6 +362,8 @@ export const remove = mutation({
     const cat = await ctx.db.get(id);
     if (!cat || cat.userId !== userId)
       throw new ConvexError({ code: 403, message: "Forbidden" });
+    if (cat.isSystem)
+      throw new ConvexError("System categories cannot be deleted");
 
     await _deleteCategory(ctx, userId, id);
   },
