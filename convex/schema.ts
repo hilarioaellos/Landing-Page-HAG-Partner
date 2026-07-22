@@ -64,46 +64,6 @@ export default defineSchema({
     .index("by_token_hash", ["tokenHash"])
     .index("by_org", ["orgId"]),
 
-  // ============ FINANZAS PERSONALES ============
-  finance_accounts: defineTable({
-    userId: v.id("users"),
-    name: v.string(),
-    type: v.union(
-      v.literal("checking"),
-      v.literal("savings"),
-      v.literal("credit"),
-      v.literal("investment"),
-      v.literal("cash")
-    ),
-    balance: v.number(),
-    currency: v.string(),
-    institution: v.optional(v.string()),
-    isActive: v.boolean(),
-  }).index("by_user", ["userId"]),
-
-  finance_transactions: defineTable({
-    userId: v.id("users"),
-    accountId: v.id("finance_accounts"),
-    amount: v.number(),
-    type: v.union(v.literal("income"), v.literal("expense"), v.literal("transfer")),
-    category: v.string(),
-    description: v.string(),
-    date: v.number(),
-    tags: v.optional(v.array(v.string())),
-    transferToAccountId: v.optional(v.id("finance_accounts")),
-  })
-    .index("by_user", ["userId"])
-    .index("by_account", ["accountId"])
-    .index("by_date", ["date"]),
-
-  finance_budgets: defineTable({
-    userId: v.id("users"),
-    category: v.string(),
-    limit: v.number(),
-    period: v.union(v.literal("monthly"), v.literal("yearly")),
-    currency: v.string(),
-  }).index("by_user", ["userId"]),
-
   // ============ CONTABILIDAD ============
   chart_of_accounts: defineTable({
     orgId: v.id("organizations"),
@@ -494,7 +454,15 @@ export default defineSchema({
 
   fintrack_notifications: defineTable({
     userId: v.id("users"),
-    type: v.string(),
+    type: v.union(
+      v.literal("payment_due"),
+      v.literal("budget_exceeded"),
+      v.literal("subscription_renewing"),
+      v.literal("debt_due"),
+      v.literal("receivable_overdue"),
+      v.literal("low_balance"),
+      v.literal("reconciliation_pending")
+    ),
     message: v.string(),
     dueDate: v.optional(v.number()),
     isRead: v.boolean(),

@@ -26,20 +26,30 @@ export const list = query({
   handler: async (ctx, { accountId, startDate, endDate, limit }) => {
     const userId = await requireUserId(ctx);
 
-    let results = await ctx.db
-      .query("fintrack_transactions")
-      .withIndex("by_date", (q) => {
-        const base = q.eq("userId", userId);
-        if (startDate !== undefined && endDate !== undefined) {
-          return base.gte("date", startDate).lte("date", endDate);
-        }
-        return base;
-      })
-      .order("desc")
-      .collect();
+    let results;
 
     if (accountId) {
-      results = results.filter((t) => t.accountId === accountId);
+      results = await ctx.db
+        .query("fintrack_transactions")
+        .withIndex("by_account", (q) => q.eq("accountId", accountId))
+        .order("desc")
+        .collect();
+      // Apply date filter in memory only when account is the primary filter
+      if (startDate !== undefined && endDate !== undefined) {
+        results = results.filter((t) => t.date >= startDate! && t.date <= endDate!);
+      }
+    } else {
+      results = await ctx.db
+        .query("fintrack_transactions")
+        .withIndex("by_date", (q) => {
+          const base = q.eq("userId", userId);
+          if (startDate !== undefined && endDate !== undefined) {
+            return base.gte("date", startDate).lte("date", endDate);
+          }
+          return base;
+        })
+        .order("desc")
+        .collect();
     }
 
     return limit ? results.slice(0, limit) : results;
@@ -395,13 +405,14 @@ export const bulkUpdateCategory = mutation({
     }
 
     let updated = 0;
+    let skipped = 0;
     for (const id of ids) {
       const tx = await ctx.db.get(id);
-      if (!tx || tx.userId !== userId) continue;
+      if (!tx || tx.userId !== userId) { skipped++; continue; }
       await ctx.db.patch(id, { categoryId });
       updated++;
     }
-    return { updated };
+    return { updated, skipped };
   },
 });
 
@@ -416,7 +427,8 @@ export const suggestCategories = query({
     const txs = await ctx.db
       .query("fintrack_transactions")
       .withIndex("by_date", (q) => q.eq("userId", userId))
-      .collect();
+      .order("desc")
+      .take(500);
 
     // Count how many times each (normalizedDesc, categoryId) pair appears
     const counts: Record<string, Record<string, number>> = {};
