@@ -24,6 +24,7 @@ import type * as fintrack_debts from "../fintrack/debts.js";
 import type * as fintrack_health from "../fintrack/health.js";
 import type * as fintrack_import from "../fintrack/import.js";
 import type * as fintrack_merchants from "../fintrack/merchants.js";
+import type * as fintrack_migrate_rename_amounts from "../fintrack/migrate_rename_amounts.js";
 import type * as fintrack_notifications from "../fintrack/notifications.js";
 import type * as fintrack_receivables from "../fintrack/receivables.js";
 import type * as fintrack_reconciliations from "../fintrack/reconciliations.js";
@@ -62,6 +63,7 @@ declare const fullApi: ApiFromModules<{
   "fintrack/health": typeof fintrack_health;
   "fintrack/import": typeof fintrack_import;
   "fintrack/merchants": typeof fintrack_merchants;
+  "fintrack/migrate_rename_amounts": typeof fintrack_migrate_rename_amounts;
   "fintrack/notifications": typeof fintrack_notifications;
   "fintrack/receivables": typeof fintrack_receivables;
   "fintrack/reconciliations": typeof fintrack_reconciliations;
