@@ -10,4 +10,11 @@ crons.daily(
   internal.fintrack.notifications.checkPaymentDueDates
 );
 
+// Weekly on Monday at 3:00 UTC — purge read notifications older than 30 days
+crons.weekly(
+  "purge_read_notifications",
+  { dayOfWeek: "monday", hourUTC: 3, minuteUTC: 0 },
+  internal.fintrack.notifications.purgeReadNotifications
+);
+
 export default crons;

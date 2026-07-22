@@ -50,7 +50,7 @@ export const create = mutation({
   args: {
     debtorName: v.string(),
     description: v.string(),
-    originalAmount: v.number(),
+    originalAmountCents: v.number(),
     currencyCode: v.string(),
     originDate: v.number(),
     dueDate: v.optional(v.number()),
@@ -66,7 +66,7 @@ export const create = mutation({
 
     if (!debtorName) throw new ConvexError("Debtor name is required");
     if (!description) throw new ConvexError("Description is required");
-    if (!Number.isInteger(args.originalAmount) || args.originalAmount <= 0)
+    if (!Number.isInteger(args.originalAmountCents) || args.originalAmountCents <= 0)
       throw new ConvexError("originalAmount must be a positive integer (cents)");
     if (args.interestRate !== undefined) {
       if (!Number.isInteger(args.interestRate) || args.interestRate < 0 || args.interestRate > 100_000)
@@ -77,8 +77,8 @@ export const create = mutation({
       userId,
       debtorName,
       description,
-      originalAmount: args.originalAmount,
-      outstandingBalance: args.originalAmount,
+      originalAmountCents: args.originalAmountCents,
+      outstandingBalanceCents: args.originalAmountCents,
       currencyCode,
       originDate: args.originDate,
       dueDate: args.dueDate,
@@ -141,7 +141,7 @@ export const update = mutation({
 export const recordPayment = mutation({
   args: {
     receivableId: v.id("fintrack_receivables"),
-    amount: v.number(),
+    amountCents: v.number(),
     paymentDate: v.number(),
     method: v.string(),
     note: v.optional(v.string()),
@@ -155,9 +155,9 @@ export const recordPayment = mutation({
       throw new ConvexError("This receivable is already fully paid");
     if (rec.status === "written_off")
       throw new ConvexError("Cannot record payment on a written-off receivable");
-    if (!Number.isInteger(args.amount) || args.amount <= 0)
+    if (!Number.isInteger(args.amountCents) || args.amountCents <= 0)
       throw new ConvexError("amount must be a positive integer (cents)");
-    if (args.amount > rec.outstandingBalance)
+    if (args.amountCents > rec.outstandingBalanceCents)
       throw new ConvexError("Payment amount exceeds outstanding balance");
 
     const method = args.method.trim();
@@ -166,17 +166,17 @@ export const recordPayment = mutation({
     await ctx.db.insert("fintrack_receivable_payments", {
       receivableId: args.receivableId,
       userId,
-      amount: args.amount,
+      amountCents: args.amountCents,
       paymentDate: args.paymentDate,
       method,
       note: args.note?.trim() || undefined,
       createdAt: Date.now(),
     });
 
-    const newBalance = rec.outstandingBalance - args.amount;
+    const newBalance = rec.outstandingBalanceCents - args.amountCents;
     const newStatus = newBalance === 0 ? "fully_paid" : "partially_paid";
     await ctx.db.patch(args.receivableId, {
-      outstandingBalance: newBalance,
+      outstandingBalanceCents: newBalance,
       status: newStatus,
     });
   },

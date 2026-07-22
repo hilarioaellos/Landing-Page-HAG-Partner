@@ -57,7 +57,7 @@ export const list = query({
 export const create = mutation({
   args: {
     name: v.string(),
-    amount: v.number(),
+    amountCents: v.number(),
     currencyCode: v.string(),
     periodicity: PERIODICITY,
     nextRenewalDate: v.number(),
@@ -69,7 +69,7 @@ export const create = mutation({
     const userId = await requireUserId(ctx);
     const name = args.name.trim();
     if (!name) throw new ConvexError("Name is required");
-    if (!Number.isInteger(args.amount) || args.amount <= 0)
+    if (!Number.isInteger(args.amountCents) || args.amountCents <= 0)
       throw new ConvexError("amount must be a positive integer (cents)");
     const currencyCode = validateCurrencyCode(args.currencyCode);
 
@@ -88,7 +88,7 @@ export const create = mutation({
     return ctx.db.insert("fintrack_subscriptions", {
       userId,
       name,
-      amount: args.amount,
+      amountCents: args.amountCents,
       currencyCode,
       periodicity: args.periodicity,
       nextRenewalDate: args.nextRenewalDate,
@@ -105,7 +105,7 @@ export const update = mutation({
   args: {
     id: v.id("fintrack_subscriptions"),
     name: v.optional(v.string()),
-    amount: v.optional(v.number()),
+    amountCents: v.optional(v.number()),
     currencyCode: v.optional(v.string()),
     periodicity: v.optional(PERIODICITY),
     nextRenewalDate: v.optional(v.number()),
@@ -125,10 +125,10 @@ export const update = mutation({
       if (!name) throw new ConvexError("Name is required");
       patch.name = name;
     }
-    if (fields.amount !== undefined) {
-      if (!Number.isInteger(fields.amount) || fields.amount <= 0)
+    if (fields.amountCents !== undefined) {
+      if (!Number.isInteger(fields.amountCents) || fields.amountCents <= 0)
         throw new ConvexError("amount must be a positive integer (cents)");
-      patch.amount = fields.amount;
+      patch.amountCents = fields.amountCents;
     }
     if (fields.currencyCode !== undefined) {
       patch.currencyCode = validateCurrencyCode(fields.currencyCode);

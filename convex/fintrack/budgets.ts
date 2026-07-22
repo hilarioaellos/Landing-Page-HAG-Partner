@@ -138,10 +138,9 @@ export const create = mutation({
     // One budget per category per period
     const existing = await ctx.db
       .query("fintrack_budgets")
-      .withIndex("by_period", (q) =>
-        q.eq("userId", userId).eq("year", args.year).eq("month", args.month)
+      .withIndex("by_period_category", (q) =>
+        q.eq("userId", userId).eq("year", args.year).eq("month", args.month).eq("categoryId", args.categoryId)
       )
-      .filter((q) => q.eq(q.field("categoryId"), args.categoryId))
       .first();
     if (existing)
       throw new ConvexError("A budget already exists for this category and month");
@@ -276,10 +275,9 @@ export const applyHistoryEstimate = mutation({
 
       const existing = await ctx.db
         .query("fintrack_budgets")
-        .withIndex("by_period", (q) =>
-          q.eq("userId", userId).eq("year", year).eq("month", month)
+        .withIndex("by_period_category", (q) =>
+          q.eq("userId", userId).eq("year", year).eq("month", month).eq("categoryId", entry.categoryId)
         )
-        .filter((q) => q.eq(q.field("categoryId"), entry.categoryId))
         .first();
 
       if (existing) {

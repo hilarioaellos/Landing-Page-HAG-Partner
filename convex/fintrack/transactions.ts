@@ -1,5 +1,6 @@
 import { ConvexError } from "convex/values";
-import { mutation, query } from "../_generated/server";
+import { action, internalMutation, mutation, query } from "../_generated/server";
+import { internal } from "../_generated/api";
 import { v } from "convex/values";
 import { requireUserId } from "./_auth";
 import { validatePositiveCents, validateCurrencyCode } from "./_money";
@@ -357,8 +358,8 @@ export const createShared = mutation({
       userId,
       debtorName: args.debtorName.trim(),
       description,
-      originalAmount: args.sharedAmountCents,
-      outstandingBalance: args.sharedAmountCents,
+      originalAmountCents: args.sharedAmountCents,
+      outstandingBalanceCents: args.sharedAmountCents,
       currencyCode,
       originDate: args.date,
       status: "active",
@@ -367,25 +368,53 @@ export const createShared = mutation({
   },
 });
 
-// Deletes all transactions for a given account and resets its balance to initialBalanceCents.
-export const clearByAccount = mutation({
+// Public action that clears all transactions for an account in batches of 200.
+// Validates authentication before starting. Balance is reset when the last batch is processed.
+export const clearByAccount = action({
   args: { accountId: v.id("fintrack_accounts") },
   handler: async (ctx, { accountId }) => {
-    const userId = await requireUserId(ctx);
-    const account = await ctx.db.get(accountId);
-    if (!account || account.userId !== userId)
-      throw new ConvexError({ code: 403, message: "Forbidden" });
+    // Actions cannot use ctx.db — must use runQuery/runMutation
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new ConvexError({ code: 401, message: "Not authenticated" });
 
-    const txs = await ctx.db
+    let totalDeleted = 0;
+    let hasMore = true;
+    while (hasMore) {
+      const result: { deleted: number; hasMore: boolean } = await ctx.runMutation(
+        internal.fintrack.transactions._clearBatch,
+        { accountId, batchSize: 200 }
+      );
+      totalDeleted += result.deleted;
+      hasMore = result.hasMore;
+    }
+    return { deleted: totalDeleted };
+  },
+});
+
+// Internal mutation that deletes one page of transactions for an account.
+// On the final batch (no more transactions), resets the account balance to initialBalanceCents.
+export const _clearBatch = internalMutation({
+  args: {
+    accountId: v.id("fintrack_accounts"),
+    batchSize: v.number(),
+  },
+  handler: async (ctx, { accountId, batchSize }) => {
+    const account = await ctx.db.get(accountId);
+    if (!account) throw new ConvexError({ code: 404, message: "Account not found" });
+
+    const batch = await ctx.db
       .query("fintrack_transactions")
       .withIndex("by_account", (q) => q.eq("accountId", accountId))
-      .collect();
+      .take(batchSize);
 
-    for (const tx of txs) await ctx.db.delete(tx._id);
+    for (const tx of batch) await ctx.db.delete(tx._id);
 
-    await ctx.db.patch(accountId, { balanceCents: account.initialBalanceCents });
+    // If no more transactions, reset balance
+    if (batch.length < batchSize) {
+      await ctx.db.patch(accountId, { balanceCents: account.initialBalanceCents });
+    }
 
-    return { deleted: txs.length };
+    return { deleted: batch.length, hasMore: batch.length === batchSize };
   },
 });
 

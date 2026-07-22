@@ -60,9 +60,8 @@ export const markAllAsRead = mutation({
     const userId = await requireUserId(ctx);
     const unread = await ctx.db
       .query("fintrack_notifications")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .filter((q) => q.eq(q.field("isRead"), false))
-      .collect();
+      .withIndex("by_user_unread", (q) => q.eq("userId", userId).eq("isRead", false))
+      .take(200);
     for (const notif of unread) {
       await ctx.db.patch(notif._id, { isRead: true });
     }
@@ -96,9 +95,34 @@ export const checkPaymentDueDates = internalMutation({
             dueDate: today.getTime(),
             isRead: false,
             severity: "urgent",
+            createdAt: Date.now(),
           });
         }
       }
     }
+  },
+});
+
+// Deletes read notifications older than 30 days, in batches of 500.
+// Called by the weekly cron in crons.ts.
+export const purgeReadNotifications = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    // Query all read notifications (no user filter needed for maintenance job).
+    // Use _creationTime as a proxy when createdAt is not set on older documents.
+    const batch = await ctx.db
+      .query("fintrack_notifications")
+      .filter((q) => q.eq(q.field("isRead"), true))
+      .take(500);
+    let deleted = 0;
+    for (const notif of batch) {
+      const ts = notif.createdAt ?? notif._creationTime;
+      if (ts < cutoff) {
+        await ctx.db.delete(notif._id);
+        deleted++;
+      }
+    }
+    return { deleted };
   },
 });

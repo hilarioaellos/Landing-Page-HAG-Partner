@@ -329,7 +329,9 @@ export default defineSchema({
     initialBalanceCents: v.number(),
     balanceCents: v.number(),
     isActive: v.boolean(),
-  }).index("by_user", ["userId"]),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_active", ["userId", "isActive"]),
 
   fintrack_transactions: defineTable({
     userId: v.id("users"),
@@ -354,7 +356,8 @@ export default defineSchema({
     .index("by_account", ["accountId"])
     .index("by_date", ["userId", "date"])
     .index("by_category", ["userId", "categoryId"])
-    .index("by_import_hash", ["userId", "importHash"]),
+    .index("by_import_hash", ["userId", "importHash"])
+    .index("by_account_date", ["accountId", "date"]),
 
   fintrack_categories: defineTable({
     userId: v.id("users"),
@@ -394,7 +397,8 @@ export default defineSchema({
     amountPlannedCents: v.number(),
   })
     .index("by_user", ["userId"])
-    .index("by_period", ["userId", "year", "month"]),
+    .index("by_period", ["userId", "year", "month"])
+    .index("by_period_category", ["userId", "year", "month", "categoryId"]),
 
   fintrack_debts: defineTable({
     userId: v.id("users"),
@@ -472,9 +476,11 @@ export default defineSchema({
       v.literal("good"),
       v.literal("info")
     ),
+    createdAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
-    .index("by_user_unread", ["userId", "isRead"]),
+    .index("by_user_unread", ["userId", "isRead"])
+    .index("by_user_created", ["userId", "createdAt"]),
 
   fintrack_reconciliations: defineTable({
     userId: v.id("users"),
@@ -506,7 +512,7 @@ export default defineSchema({
   fintrack_subscriptions: defineTable({
     userId: v.id("users"),
     name: v.string(),
-    amount: v.number(),
+    amountCents: v.number(),
     currencyCode: v.string(),
     periodicity: v.union(
       v.literal("monthly"),
@@ -530,8 +536,8 @@ export default defineSchema({
     userId: v.id("users"),
     debtorName: v.string(),
     description: v.string(),
-    originalAmount: v.number(),
-    outstandingBalance: v.number(),
+    originalAmountCents: v.number(),
+    outstandingBalanceCents: v.number(),
     currencyCode: v.string(),
     originDate: v.number(),
     dueDate: v.optional(v.number()),
@@ -558,12 +564,13 @@ export default defineSchema({
   fintrack_receivable_payments: defineTable({
     receivableId: v.id("fintrack_receivables"),
     userId: v.id("users"),
-    amount: v.number(),
+    amountCents: v.number(),
     paymentDate: v.number(),
     method: v.string(),
     note: v.optional(v.string()),
     createdAt: v.number(),
   })
     .index("by_receivable", ["receivableId"])
-    .index("by_user", ["userId"]),
+    .index("by_user", ["userId"])
+    .index("by_user_receivable", ["userId", "receivableId"]),
 });
